@@ -132,7 +132,7 @@ export default function WineDetail({
                 padding: "5px 12px",
               }}
             >
-              📍 {fridges.find((f) => f.id === wine.fridge_id)?.name || "Unknown"}
+              📍 {fridges.find((f) => f.id === wine.fridge_id)?.name ?? "Unknown"}
             </div>
           )}
         </div>

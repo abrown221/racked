@@ -15,7 +15,7 @@ export default function CellarPage() {
   const [selectedWine, setSelectedWine] = useState<Wine | null>(null);
   const [tastingWine, setTastingWine] = useState<Wine | null>(null);
   const [filter, setFilter] = useState("all");
-  const [loadingDossier, setLoadingDossier] = useState(false);
+  const [researchingWineId, setResearchingWineId] = useState<string | null>(null);
 
   const activeWines = wines.filter((w) => w.status !== "consumed");
 
@@ -71,7 +71,7 @@ export default function CellarPage() {
 
   const handleResearch = async (wine: Wine) => {
     if (getDossier(wine.id)) return;
-    setLoadingDossier(true);
+    setResearchingWineId(wine.id);
     try {
       const res = await fetch("/api/wine/research", {
         method: "POST",
@@ -87,7 +87,7 @@ export default function CellarPage() {
         await saveDossier(wine.id, data);
       }
     } catch {}
-    setLoadingDossier(false);
+    setResearchingWineId(null);
   };
 
   if (loading) {
@@ -231,7 +231,7 @@ export default function CellarPage() {
           wine={selectedWine}
           fridges={fridges}
           dossier={getDossier(selectedWine.id) || null}
-          loadingDossier={loadingDossier}
+          loadingDossier={researchingWineId === selectedWine.id}
           tastingNotes={tastingNotes[selectedWine.id] || []}
           onClose={() => setSelectedWine(null)}
           onConsume={handleConsume}

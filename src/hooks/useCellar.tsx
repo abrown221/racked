@@ -138,12 +138,17 @@ export function CellarProvider({ children }: { children: ReactNode }) {
       const cellarId = membership.cellar_id;
 
       // Load cellar
-      const { data: cellarData } = await supabase
+      const { data: cellarData, error: cellarQueryErr } = await supabase
         .from("cellars")
         .select("*")
         .eq("id", cellarId)
         .single();
 
+      if (cellarQueryErr) {
+        showError(`Failed to load cellar: ${cellarQueryErr.message}`);
+        setLoading(false);
+        return;
+      }
       if (cellarData) setCellar(cellarData);
 
       // Load wines, fridges, wishlist in parallel
@@ -165,19 +170,24 @@ export function CellarProvider({ children }: { children: ReactNode }) {
           .order("created_at", { ascending: false }),
       ]);
 
+      if (winesRes.error) showError(`Failed to load wines: ${winesRes.error.message}`);
+      if (fridgesRes.error) showError(`Failed to load fridges: ${fridgesRes.error.message}`);
+      if (wishlistRes.error) showError(`Failed to load wishlist: ${wishlistRes.error.message}`);
+
       const loadedWines = winesRes.data || [];
-      if (loadedWines.length > 0) setWines(loadedWines);
+      setWines(loadedWines);
       if (fridgesRes.data) setFridges(fridgesRes.data);
       if (wishlistRes.data) setWishlist(wishlistRes.data);
 
       // Load dossiers for wines
       if (loadedWines.length > 0) {
         const wineIds = loadedWines.map((w) => w.id);
-        const { data: dossiersData } = await supabase
+        const { data: dossiersData, error: dossierErr } = await supabase
           .from("dossiers")
           .select("*")
           .in("wine_id", wineIds);
 
+        if (dossierErr) showError(`Failed to load dossiers: ${dossierErr.message}`);
         if (dossiersData) {
           const map: Record<string, Dossier> = {};
           dossiersData.forEach((d) => (map[d.wine_id] = d));

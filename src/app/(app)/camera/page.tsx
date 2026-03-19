@@ -48,6 +48,7 @@ export default function CameraPage() {
   const [bookResults, setBookResults] = useState<BookResult[] | null>(null);
   const [selectedFridge, setSelectedFridge] = useState<string | null>(null);
   const [pricePaid, setPricePaid] = useState("");
+  const [cameraError, setCameraError] = useState<string | null>(null);
 
   const activeWines = wines.filter((w) => w.status !== "consumed");
 
@@ -60,6 +61,7 @@ export default function CameraPage() {
     setShopResults(null);
     setBookResults(null);
     setIntent(null);
+    setCameraError(null);
 
     const reader = new FileReader();
     reader.onload = async () => {
@@ -145,6 +147,7 @@ export default function CameraPage() {
         }
       } catch (err) {
         console.error(err);
+        setCameraError(err instanceof Error ? err.message : "Something went wrong analyzing the photo. Try again.");
         setState("idle");
       }
     };
@@ -217,6 +220,22 @@ export default function CameraPage() {
         onChange={handlePhoto}
         className="hidden"
       />
+
+      {cameraError && (
+        <div
+          style={{
+            padding: "14px 16px",
+            background: "rgba(155,51,51,0.1)",
+            border: "1px solid rgba(155,51,51,0.25)",
+            borderRadius: "14px",
+            marginBottom: "16px",
+            fontSize: "13px",
+            color: "#9B3333",
+          }}
+        >
+          {cameraError}
+        </div>
+      )}
 
       {state === "idle" && (
         <div className="text-center" style={{ padding: "40px 0" }}>
