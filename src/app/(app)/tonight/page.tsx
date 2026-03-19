@@ -15,10 +15,13 @@ export default function TonightPage() {
     wines,
     fridges,
     dossiers,
+    tastingNotes,
     loading,
     updateWine,
     saveDossier,
     getDossier,
+    saveTastingNote,
+    loadTastingNotes,
   } = useCellar();
   const [selectedWine, setSelectedWine] = useState<Wine | null>(null);
   const [tastingWine, setTastingWine] = useState<Wine | null>(null);
@@ -100,6 +103,7 @@ export default function TonightPage() {
     notes: string;
   }) => {
     if (!tastingWine) return;
+    await saveTastingNote(tastingWine.id, data);
     await updateWine(tastingWine.id, {
       status: "consumed",
       consumed_date: new Date().toISOString().split("T")[0],
@@ -429,10 +433,12 @@ export default function TonightPage() {
           fridges={fridges}
           dossier={getDossier(selectedWine.id) || null}
           loadingDossier={loadingDossier}
+          tastingNotes={tastingNotes[selectedWine.id] || []}
           onClose={() => setSelectedWine(null)}
           onConsume={handleConsume}
           onCoravin={handleCoravin}
           onResearch={() => handleResearch(selectedWine)}
+          onLoadNotes={() => loadTastingNotes(selectedWine.id)}
         />
       )}
 

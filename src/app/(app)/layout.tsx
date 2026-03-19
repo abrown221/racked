@@ -1,5 +1,6 @@
 import BottomNav from "@/components/BottomNav";
 import { CellarProvider } from "@/hooks/useCellar";
+import ErrorToast from "@/components/ErrorToast";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -8,6 +9,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="w-full max-w-[430px] min-h-screen relative">
           {children}
           <BottomNav />
+          <ErrorToast />
         </div>
       </div>
     </CellarProvider>

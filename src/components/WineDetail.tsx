@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import type { Wine, Fridge, Dossier } from "@/lib/supabase/types";
+import { useState, useEffect } from "react";
+import type { Wine, Fridge, Dossier, TastingNote } from "@/lib/supabase/types";
 import {
   getDrinkingWindowStatus,
   WINDOW_COLORS,
@@ -14,10 +14,12 @@ type Props = {
   fridges: Fridge[];
   dossier: Dossier | null;
   loadingDossier: boolean;
+  tastingNotes: TastingNote[];
   onClose: () => void;
   onConsume: (wine: Wine) => void;
   onCoravin: (wine: Wine) => void;
   onResearch: () => void;
+  onLoadNotes: () => void;
 };
 
 export default function WineDetail({
@@ -25,14 +27,24 @@ export default function WineDetail({
   fridges,
   dossier,
   loadingDossier,
+  tastingNotes,
   onClose,
   onConsume,
   onCoravin,
   onResearch,
+  onLoadNotes,
 }: Props) {
   const [tab, setTab] = useState<"overview" | "dossier" | "notes">("overview");
+  const [notesLoaded, setNotesLoaded] = useState(false);
   const windowStatus = getDrinkingWindowStatus(wine);
   const windowColor = WINDOW_COLORS[windowStatus];
+
+  useEffect(() => {
+    if (tab === "notes" && !notesLoaded) {
+      onLoadNotes();
+      setNotesLoaded(true);
+    }
+  }, [tab, notesLoaded, onLoadNotes]);
 
   return (
     <div
@@ -327,11 +339,121 @@ export default function WineDetail({
         )}
 
         {tab === "notes" && (
-          <div
-            className="text-center"
-            style={{ padding: "40px 0", color: "#8C7E72" }}
-          >
-            No tasting notes yet
+          <div>
+            {tastingNotes.length > 0 ? (
+              <div className="flex flex-col gap-4">
+                {tastingNotes.map((note) => (
+                  <div
+                    key={note.id}
+                    style={{
+                      background: "#FFFFFF",
+                      border: "1px solid #DDD5CA",
+                      borderRadius: "16px",
+                      padding: "16px",
+                      boxShadow: "0 2px 12px rgba(45,36,27,0.06)",
+                    }}
+                  >
+                    {/* Rating */}
+                    {note.rating && (
+                      <div style={{ marginBottom: "10px" }}>
+                        <div className="flex gap-1">
+                          {[1, 2, 3, 4, 5].map((n) => (
+                            <span
+                              key={n}
+                              style={{
+                                fontSize: "20px",
+                                color: n <= note.rating! ? "#A0864E" : "#DDD5CA",
+                              }}
+                            >
+                              ★
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Tags */}
+                    {note.tags && note.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5" style={{ marginBottom: "10px" }}>
+                        {note.tags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="rounded-full"
+                            style={{
+                              padding: "4px 12px",
+                              fontSize: "11px",
+                              background: "rgba(114,47,55,0.1)",
+                              border: "1px solid rgba(114,47,55,0.2)",
+                              color: "#722F37",
+                            }}
+                          >
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Buy again */}
+                    {note.buy_again && (
+                      <div style={{ marginBottom: "8px" }}>
+                        <span
+                          className="rounded-full"
+                          style={{
+                            padding: "4px 12px",
+                            fontSize: "11px",
+                            fontWeight: 500,
+                            background:
+                              note.buy_again === "yes"
+                                ? "rgba(90,122,74,0.12)"
+                                : note.buy_again === "at-this-price"
+                                  ? "rgba(160,134,78,0.15)"
+                                  : "rgba(155,51,51,0.1)",
+                            color:
+                              note.buy_again === "yes"
+                                ? "#5A7A4A"
+                                : note.buy_again === "at-this-price"
+                                  ? "#A0864E"
+                                  : "#9B3333",
+                          }}
+                        >
+                          {note.buy_again === "yes"
+                            ? "Buy again"
+                            : note.buy_again === "at-this-price"
+                              ? "Buy again at this price"
+                              : "Would not buy again"}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Free text notes */}
+                    {note.notes && (
+                      <p
+                        className="leading-relaxed"
+                        style={{ fontSize: "13px", color: "#6B5E52", margin: 0 }}
+                      >
+                        {note.notes}
+                      </p>
+                    )}
+
+                    {/* Date */}
+                    <div style={{ fontSize: "11px", color: "#8C7E72", marginTop: "10px" }}>
+                      Tasted {new Date(note.tasted_date).toLocaleDateString("en-US", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div
+                className="text-center"
+                style={{ padding: "40px 0", color: "#8C7E72" }}
+              >
+                No tasting notes yet
+              </div>
+            )}
           </div>
         )}
       </div>

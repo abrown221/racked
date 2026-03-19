@@ -9,7 +9,7 @@ import TastingFlow from "@/components/TastingFlow";
 import type { Wine } from "@/lib/supabase/types";
 
 export default function CellarPage() {
-  const { wines, fridges, loading, updateWine, saveDossier, getDossier } =
+  const { wines, fridges, tastingNotes, loading, updateWine, saveDossier, getDossier, saveTastingNote, loadTastingNotes } =
     useCellar();
   const router = useRouter();
   const [selectedWine, setSelectedWine] = useState<Wine | null>(null);
@@ -61,6 +61,7 @@ export default function CellarPage() {
     notes: string;
   }) => {
     if (!tastingWine) return;
+    await saveTastingNote(tastingWine.id, data);
     await updateWine(tastingWine.id, {
       status: "consumed",
       consumed_date: new Date().toISOString().split("T")[0],
@@ -231,10 +232,12 @@ export default function CellarPage() {
           fridges={fridges}
           dossier={getDossier(selectedWine.id) || null}
           loadingDossier={loadingDossier}
+          tastingNotes={tastingNotes[selectedWine.id] || []}
           onClose={() => setSelectedWine(null)}
           onConsume={handleConsume}
           onCoravin={handleCoravin}
           onResearch={() => handleResearch(selectedWine)}
+          onLoadNotes={() => loadTastingNotes(selectedWine.id)}
         />
       )}
 

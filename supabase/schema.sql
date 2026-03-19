@@ -66,24 +66,36 @@ CREATE POLICY "Owners can update cellars"
   USING (auth.uid() = owner_id);
 
 -- Cellar members policies
+-- Users can always view their own memberships
 CREATE POLICY "Members can view membership"
   ON cellar_members FOR SELECT
   USING (user_id = auth.uid());
 
-CREATE POLICY "Owners can manage members"
-  ON cellar_members FOR ALL
-  USING (
-    EXISTS (
-      SELECT 1 FROM cellar_members cm
-      WHERE cm.cellar_id = cellar_members.cellar_id
-      AND cm.user_id = auth.uid()
-      AND cm.role = 'owner'
-    )
-  );
-
+-- Users can insert their own membership (needed for initial signup flow)
 CREATE POLICY "Users can insert own membership"
   ON cellar_members FOR INSERT
   WITH CHECK (user_id = auth.uid());
+
+-- Owners can update/delete members in their cellars
+CREATE POLICY "Owners can update members"
+  ON cellar_members FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM cellars
+      WHERE cellars.id = cellar_members.cellar_id
+      AND cellars.owner_id = auth.uid()
+    )
+  );
+
+CREATE POLICY "Owners can delete members"
+  ON cellar_members FOR DELETE
+  USING (
+    EXISTS (
+      SELECT 1 FROM cellars
+      WHERE cellars.id = cellar_members.cellar_id
+      AND cellars.owner_id = auth.uid()
+    )
+  );
 
 -- 4. Fridges
 CREATE TABLE IF NOT EXISTS fridges (
@@ -108,8 +120,30 @@ CREATE POLICY "Members can view fridges"
     )
   );
 
-CREATE POLICY "Editors can manage fridges"
-  ON fridges FOR ALL
+CREATE POLICY "Editors can insert fridges"
+  ON fridges FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM cellar_members
+      WHERE cellar_members.cellar_id = fridges.cellar_id
+      AND cellar_members.user_id = auth.uid()
+      AND cellar_members.role IN ('owner', 'editor')
+    )
+  );
+
+CREATE POLICY "Editors can update fridges"
+  ON fridges FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM cellar_members
+      WHERE cellar_members.cellar_id = fridges.cellar_id
+      AND cellar_members.user_id = auth.uid()
+      AND cellar_members.role IN ('owner', 'editor')
+    )
+  );
+
+CREATE POLICY "Editors can delete fridges"
+  ON fridges FOR DELETE
   USING (
     EXISTS (
       SELECT 1 FROM cellar_members
@@ -162,8 +196,30 @@ CREATE POLICY "Members can view wines"
     )
   );
 
-CREATE POLICY "Editors can manage wines"
-  ON wines FOR ALL
+CREATE POLICY "Editors can insert wines"
+  ON wines FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM cellar_members
+      WHERE cellar_members.cellar_id = wines.cellar_id
+      AND cellar_members.user_id = auth.uid()
+      AND cellar_members.role IN ('owner', 'editor')
+    )
+  );
+
+CREATE POLICY "Editors can update wines"
+  ON wines FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM cellar_members
+      WHERE cellar_members.cellar_id = wines.cellar_id
+      AND cellar_members.user_id = auth.uid()
+      AND cellar_members.role IN ('owner', 'editor')
+    )
+  );
+
+CREATE POLICY "Editors can delete wines"
+  ON wines FOR DELETE
   USING (
     EXISTS (
       SELECT 1 FROM cellar_members
@@ -200,8 +256,16 @@ CREATE POLICY "Members can view tasting notes"
     )
   );
 
-CREATE POLICY "Users can manage own tasting notes"
-  ON tasting_notes FOR ALL
+CREATE POLICY "Users can insert own tasting notes"
+  ON tasting_notes FOR INSERT
+  WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "Users can update own tasting notes"
+  ON tasting_notes FOR UPDATE
+  USING (user_id = auth.uid());
+
+CREATE POLICY "Users can delete own tasting notes"
+  ON tasting_notes FOR DELETE
   USING (user_id = auth.uid());
 
 -- 7. Dossiers
@@ -230,8 +294,20 @@ CREATE POLICY "Members can view dossiers"
     )
   );
 
-CREATE POLICY "Editors can manage dossiers"
-  ON dossiers FOR ALL
+CREATE POLICY "Editors can insert dossiers"
+  ON dossiers FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM wines
+      JOIN cellar_members ON cellar_members.cellar_id = wines.cellar_id
+      WHERE wines.id = dossiers.wine_id
+      AND cellar_members.user_id = auth.uid()
+      AND cellar_members.role IN ('owner', 'editor')
+    )
+  );
+
+CREATE POLICY "Editors can update dossiers"
+  ON dossiers FOR UPDATE
   USING (
     EXISTS (
       SELECT 1 FROM wines
@@ -268,8 +344,19 @@ CREATE POLICY "Members can view wishlist"
     )
   );
 
-CREATE POLICY "Editors can manage wishlist"
-  ON wishlist FOR ALL
+CREATE POLICY "Editors can insert wishlist"
+  ON wishlist FOR INSERT
+  WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM cellar_members
+      WHERE cellar_members.cellar_id = wishlist.cellar_id
+      AND cellar_members.user_id = auth.uid()
+      AND cellar_members.role IN ('owner', 'editor')
+    )
+  );
+
+CREATE POLICY "Editors can update wishlist"
+  ON wishlist FOR UPDATE
   USING (
     EXISTS (
       SELECT 1 FROM cellar_members
@@ -279,6 +366,35 @@ CREATE POLICY "Editors can manage wishlist"
     )
   );
 
--- Storage bucket for wine label photos
--- Run this via Supabase dashboard or API:
--- INSERT INTO storage.buckets (id, name, public) VALUES ('wine-labels', 'wine-labels', true);
+CREATE POLICY "Editors can delete wishlist"
+  ON wishlist FOR DELETE
+  USING (
+    EXISTS (
+      SELECT 1 FROM cellar_members
+      WHERE cellar_members.cellar_id = wishlist.cellar_id
+      AND cellar_members.user_id = auth.uid()
+      AND cellar_members.role IN ('owner', 'editor')
+    )
+  );
+
+-- 9. Storage bucket for wine label photos
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('wine-labels', 'wine-labels', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- Storage policies: anyone can view (public bucket), authenticated users can upload
+CREATE POLICY "Public read access for wine labels"
+  ON storage.objects FOR SELECT
+  USING (bucket_id = 'wine-labels');
+
+CREATE POLICY "Authenticated users can upload wine labels"
+  ON storage.objects FOR INSERT
+  WITH CHECK (bucket_id = 'wine-labels' AND auth.role() = 'authenticated');
+
+CREATE POLICY "Users can update own wine label uploads"
+  ON storage.objects FOR UPDATE
+  USING (bucket_id = 'wine-labels' AND auth.role() = 'authenticated');
+
+CREATE POLICY "Users can delete own wine label uploads"
+  ON storage.objects FOR DELETE
+  USING (bucket_id = 'wine-labels' AND auth.role() = 'authenticated');

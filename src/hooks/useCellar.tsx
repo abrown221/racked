@@ -14,8 +14,16 @@ import type {
   Fridge,
   WishlistItem,
   Dossier,
+  TastingNote,
   Cellar,
 } from "@/lib/supabase/types";
+
+type TastingNoteInput = {
+  rating: number;
+  tags: string[];
+  buyAgain: string | null;
+  notes: string;
+};
 
 type CellarContextType = {
   cellar: Cellar | null;
@@ -23,7 +31,10 @@ type CellarContextType = {
   fridges: Fridge[];
   wishlist: WishlistItem[];
   dossiers: Record<string, Dossier>;
+  tastingNotes: Record<string, TastingNote[]>;
   loading: boolean;
+  error: string | null;
+  clearError: () => void;
   refreshWines: () => Promise<void>;
   refreshFridges: () => Promise<void>;
   refreshWishlist: () => Promise<void>;
@@ -36,6 +47,8 @@ type CellarContextType = {
   removeWishlistItem: (id: string) => Promise<void>;
   saveDossier: (wineId: string, dossier: Partial<Dossier>) => Promise<void>;
   getDossier: (wineId: string) => Dossier | undefined;
+  saveTastingNote: (wineId: string, data: TastingNoteInput) => Promise<void>;
+  loadTastingNotes: (wineId: string) => Promise<void>;
 };
 
 const CellarContext = createContext<CellarContextType | null>(null);
@@ -46,9 +59,20 @@ export function CellarProvider({ children }: { children: ReactNode }) {
   const [fridges, setFridges] = useState<Fridge[]>([]);
   const [wishlist, setWishlist] = useState<WishlistItem[]>([]);
   const [dossiers, setDossiers] = useState<Record<string, Dossier>>({});
+  const [tastingNotes, setTastingNotes] = useState<Record<string, TastingNote[]>>({});
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const supabase = createClient();
+
+  const showError = (msg: string) => {
+    console.error(msg);
+    setError(msg);
+    // Auto-clear after 5 seconds
+    setTimeout(() => setError(null), 5000);
+  };
+
+  const clearError = useCallback(() => setError(null), []);
 
   useEffect(() => {
     async function load() {
@@ -61,7 +85,7 @@ export function CellarProvider({ children }: { children: ReactNode }) {
       }
 
       // Ensure profile exists
-      await supabase.from("profiles").upsert(
+      const { error: profileErr } = await supabase.from("profiles").upsert(
         {
           id: user.id,
           email: user.email,
@@ -70,6 +94,7 @@ export function CellarProvider({ children }: { children: ReactNode }) {
         },
         { onConflict: "id" }
       );
+      if (profileErr) showError(`Profile setup failed: ${profileErr.message}`);
 
       // Get user's cellar membership
       let { data: membership } = await supabase
@@ -81,19 +106,26 @@ export function CellarProvider({ children }: { children: ReactNode }) {
 
       // Auto-create cellar if none exists
       if (!membership) {
-        const { data: newCellar } = await supabase
+        const { data: newCellar, error: cellarErr } = await supabase
           .from("cellars")
           .insert({ owner_id: user.id, name: "My Cellar" })
           .select("id")
           .single();
 
+        if (cellarErr) {
+          showError(`Cellar creation failed: ${cellarErr.message}`);
+          setLoading(false);
+          return;
+        }
+
         if (newCellar) {
-          await supabase.from("cellar_members").insert({
+          const { error: memberErr } = await supabase.from("cellar_members").insert({
             cellar_id: newCellar.id,
             user_id: user.id,
             role: "owner",
             accepted_at: new Date().toISOString(),
           });
+          if (memberErr) showError(`Membership setup failed: ${memberErr.message}`);
           membership = { cellar_id: newCellar.id };
         }
       }
@@ -138,7 +170,7 @@ export function CellarProvider({ children }: { children: ReactNode }) {
       if (fridgesRes.data) setFridges(fridgesRes.data);
       if (wishlistRes.data) setWishlist(wishlistRes.data);
 
-      // Load dossiers for wines (separate query to avoid nested async)
+      // Load dossiers for wines
       if (loadedWines.length > 0) {
         const wineIds = loadedWines.map((w) => w.id);
         const { data: dossiersData } = await supabase
@@ -197,11 +229,13 @@ export function CellarProvider({ children }: { children: ReactNode }) {
 
       if (photoFile) {
         const path = `${cellar.id}/${Date.now()}.jpg`;
-        const { error } = await supabase.storage
+        const { error: uploadErr } = await supabase.storage
           .from("wine-labels")
           .upload(path, photoFile, { contentType: "image/jpeg" });
 
-        if (!error) {
+        if (uploadErr) {
+          showError(`Photo upload failed: ${uploadErr.message}`);
+        } else {
           photo_path = path;
           const {
             data: { publicUrl },
@@ -210,7 +244,7 @@ export function CellarProvider({ children }: { children: ReactNode }) {
         }
       }
 
-      const { data, error } = await supabase
+      const { data, error: insertErr } = await supabase
         .from("wines")
         .insert({
           ...wine,
@@ -221,11 +255,14 @@ export function CellarProvider({ children }: { children: ReactNode }) {
         .select()
         .single();
 
+      if (insertErr) {
+        showError(`Failed to add wine: ${insertErr.message}`);
+        return null;
+      }
       if (data) {
         setWines((prev) => [data, ...prev]);
         return data;
       }
-      if (error) console.error("addWine error:", error);
       return null;
     },
     [cellar]
@@ -233,16 +270,18 @@ export function CellarProvider({ children }: { children: ReactNode }) {
 
   const updateWine = useCallback(
     async (id: string, updates: Partial<Wine>) => {
-      const { error } = await supabase
+      const { error: updateErr } = await supabase
         .from("wines")
         .update({ ...updates, updated_at: new Date().toISOString() })
         .eq("id", id);
 
-      if (!error) {
-        setWines((prev) =>
-          prev.map((w) => (w.id === id ? { ...w, ...updates } : w))
-        );
+      if (updateErr) {
+        showError(`Failed to update wine: ${updateErr.message}`);
+        return;
       }
+      setWines((prev) =>
+        prev.map((w) => (w.id === id ? { ...w, ...updates } : w))
+      );
     },
     []
   );
@@ -250,11 +289,15 @@ export function CellarProvider({ children }: { children: ReactNode }) {
   const addFridge = useCallback(
     async (fridge: Partial<Fridge>) => {
       if (!cellar) return;
-      const { data } = await supabase
+      const { data, error: insertErr } = await supabase
         .from("fridges")
         .insert({ ...fridge, cellar_id: cellar.id })
         .select()
         .single();
+      if (insertErr) {
+        showError(`Failed to add fridge: ${insertErr.message}`);
+        return;
+      }
       if (data) setFridges((prev) => [...prev, data]);
     },
     [cellar]
@@ -262,26 +305,34 @@ export function CellarProvider({ children }: { children: ReactNode }) {
 
   const updateFridge = useCallback(
     async (id: string, updates: Partial<Fridge>) => {
-      const { error } = await supabase
+      const { error: updateErr } = await supabase
         .from("fridges")
         .update(updates)
         .eq("id", id);
-      if (!error) {
-        setFridges((prev) =>
-          prev.map((f) => (f.id === id ? { ...f, ...updates } : f))
-        );
+      if (updateErr) {
+        showError(`Failed to update fridge: ${updateErr.message}`);
+        return;
       }
+      setFridges((prev) =>
+        prev.map((f) => (f.id === id ? { ...f, ...updates } : f))
+      );
     },
     []
   );
 
   const deleteFridge = useCallback(
     async (id: string) => {
-      await supabase
+      const { error: unassignErr } = await supabase
         .from("wines")
         .update({ fridge_id: null })
         .eq("fridge_id", id);
-      await supabase.from("fridges").delete().eq("id", id);
+      if (unassignErr) showError(`Failed to unassign wines: ${unassignErr.message}`);
+
+      const { error: deleteErr } = await supabase.from("fridges").delete().eq("id", id);
+      if (deleteErr) {
+        showError(`Failed to delete fridge: ${deleteErr.message}`);
+        return;
+      }
       setFridges((prev) => prev.filter((f) => f.id !== id));
       setWines((prev) =>
         prev.map((w) => (w.fridge_id === id ? { ...w, fridge_id: null } : w))
@@ -293,28 +344,40 @@ export function CellarProvider({ children }: { children: ReactNode }) {
   const addWishlistItem = useCallback(
     async (item: Partial<WishlistItem>) => {
       if (!cellar) return;
-      const { data } = await supabase
+      const { data, error: insertErr } = await supabase
         .from("wishlist")
         .insert({ ...item, cellar_id: cellar.id })
         .select()
         .single();
+      if (insertErr) {
+        showError(`Failed to add to wishlist: ${insertErr.message}`);
+        return;
+      }
       if (data) setWishlist((prev) => [data, ...prev]);
     },
     [cellar]
   );
 
   const removeWishlistItem = useCallback(async (id: string) => {
-    await supabase.from("wishlist").delete().eq("id", id);
+    const { error: deleteErr } = await supabase.from("wishlist").delete().eq("id", id);
+    if (deleteErr) {
+      showError(`Failed to remove from wishlist: ${deleteErr.message}`);
+      return;
+    }
     setWishlist((prev) => prev.filter((w) => w.id !== id));
   }, []);
 
   const saveDossier = useCallback(
     async (wineId: string, dossier: Partial<Dossier>) => {
-      const { data } = await supabase
+      const { data, error: upsertErr } = await supabase
         .from("dossiers")
         .upsert({ ...dossier, wine_id: wineId }, { onConflict: "wine_id" })
         .select()
         .single();
+      if (upsertErr) {
+        showError(`Failed to save dossier: ${upsertErr.message}`);
+        return;
+      }
       if (data) {
         setDossiers((prev) => ({ ...prev, [wineId]: data }));
       }
@@ -327,6 +390,66 @@ export function CellarProvider({ children }: { children: ReactNode }) {
     [dossiers]
   );
 
+  const saveTastingNote = useCallback(
+    async (wineId: string, data: TastingNoteInput) => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) {
+        showError("Must be logged in to save tasting notes");
+        return;
+      }
+
+      const { data: note, error: insertErr } = await supabase
+        .from("tasting_notes")
+        .upsert(
+          {
+            wine_id: wineId,
+            user_id: user.id,
+            rating: data.rating || null,
+            tags: data.tags.length > 0 ? data.tags : null,
+            buy_again: data.buyAgain,
+            notes: data.notes || null,
+            tasted_date: new Date().toISOString().split("T")[0],
+          },
+          { onConflict: "wine_id,user_id,tasted_date" }
+        )
+        .select()
+        .single();
+
+      if (insertErr) {
+        showError(`Failed to save tasting note: ${insertErr.message}`);
+        return;
+      }
+      if (note) {
+        setTastingNotes((prev) => ({
+          ...prev,
+          [wineId]: [...(prev[wineId] || []).filter((n) => n.id !== note.id), note],
+        }));
+      }
+    },
+    []
+  );
+
+  const loadTastingNotes = useCallback(
+    async (wineId: string) => {
+      const { data, error: fetchErr } = await supabase
+        .from("tasting_notes")
+        .select("*")
+        .eq("wine_id", wineId)
+        .order("tasted_date", { ascending: false });
+
+      if (fetchErr) {
+        showError(`Failed to load tasting notes: ${fetchErr.message}`);
+        return;
+      }
+      if (data) {
+        setTastingNotes((prev) => ({ ...prev, [wineId]: data }));
+      }
+    },
+    []
+  );
+
   return (
     <CellarContext.Provider
       value={{
@@ -335,7 +458,10 @@ export function CellarProvider({ children }: { children: ReactNode }) {
         fridges,
         wishlist,
         dossiers,
+        tastingNotes,
         loading,
+        error,
+        clearError,
         refreshWines,
         refreshFridges,
         refreshWishlist,
@@ -348,6 +474,8 @@ export function CellarProvider({ children }: { children: ReactNode }) {
         removeWishlistItem,
         saveDossier,
         getDossier,
+        saveTastingNote,
+        loadTastingNotes,
       }}
     >
       {children}
