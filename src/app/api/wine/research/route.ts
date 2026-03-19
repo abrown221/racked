@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { callClaude, parseJSON } from "@/lib/anthropic";
 import { getResearchPrompt } from "@/lib/prompts";
 
+export const maxDuration = 60;
+
 export async function POST(req: NextRequest) {
   try {
     const { name, producer, vintage } = await req.json();

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { callClaude, parseJSON } from "@/lib/anthropic";
+import { callClaude } from "@/lib/anthropic";
 import { DETECT_INTENT_PROMPT } from "@/lib/prompts";
+
+export const maxDuration = 30;
 
 export async function POST(req: NextRequest) {
   try {

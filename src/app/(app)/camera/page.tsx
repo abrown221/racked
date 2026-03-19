@@ -36,6 +36,34 @@ type BookResult = {
   searchQuery: string;
 };
 
+/** Resize image to max dimension, return { base64, dataUrl, mediaType } */
+function resizeImage(
+  file: File,
+  maxDim = 1200
+): Promise<{ base64: string; dataUrl: string; mediaType: string }> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+      if (width > maxDim || height > maxDim) {
+        const scale = maxDim / Math.max(width, height);
+        width = Math.round(width * scale);
+        height = Math.round(height * scale);
+      }
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(img, 0, 0, width, height);
+      const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+      const base64 = dataUrl.split(",")[1];
+      resolve({ base64, dataUrl, mediaType: "image/jpeg" });
+    };
+    img.onerror = () => reject(new Error("Failed to load image"));
+    img.src = URL.createObjectURL(file);
+  });
+}
+
 export default function CameraPage() {
   const { wines, fridges, wishlist, addWine, addWishlistItem } = useCellar();
   const router = useRouter();
@@ -63,95 +91,121 @@ export default function CameraPage() {
     setIntent(null);
     setCameraError(null);
 
-    const reader = new FileReader();
-    reader.onload = async () => {
-      const dataUrl = reader.result as string;
-      const base64 = dataUrl.split(",")[1];
-      const mediaType = file.type || "image/jpeg";
+    try {
+      // Resize image to prevent oversized payloads
+      const { base64, dataUrl, mediaType } = await resizeImage(file);
 
-      try {
-        // Detect intent
-        const intentRes = await fetch("/api/wine/detect-intent", {
+      // Detect intent
+      const intentRes = await fetch("/api/wine/detect-intent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ base64, mediaType }),
+      });
+      if (!intentRes.ok) {
+        const err = await intentRes.json().catch(() => ({}));
+        throw new Error(err.error || `Intent detection failed (${intentRes.status})`);
+      }
+      const { intent: detectedIntent } = await intentRes.json();
+      setIntent(detectedIntent);
+
+      if (
+        detectedIntent === "label" ||
+        detectedIntent === "bottles" ||
+        detectedIntent === "fridge" ||
+        detectedIntent === "other" ||
+        !detectedIntent
+      ) {
+        // Label identification (also fallback for unknown/missing intent)
+        const identRes = await fetch("/api/wine/identify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ base64, mediaType }),
         });
-        const { intent: detectedIntent } = await intentRes.json();
-        setIntent(detectedIntent);
-
-        if (
-          detectedIntent === "label" ||
-          detectedIntent === "bottles" ||
-          detectedIntent === "fridge" ||
-          detectedIntent === "other"
-        ) {
-          const identRes = await fetch("/api/wine/identify", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ base64, mediaType }),
-          });
-          const result = await identRes.json();
-          if (result && !result.error) {
-            result.photoDataUrl = dataUrl;
-            // Auto-suggest fridge
-            const dailyF = fridges.find((f) => f.type === "daily");
-            const cellarF = fridges.find((f) => f.type === "cellar");
-            setSelectedFridge(
-              result.fridgeSuggestion === "daily" && dailyF
-                ? dailyF.id
-                : cellarF?.id || fridges[0]?.id || null
-            );
-            setCameraResult(result);
-          }
-          setState("result");
-        } else if (detectedIntent === "shelf") {
-          const cellarNames = wines
-            .map((w) => `${w.vintage} ${w.producer} ${w.name}`)
-            .join(", ");
-          const wishNames = wishlist.map((w) => w.name).join(", ");
-          const shelfRes = await fetch("/api/wine/analyze-shelf", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              base64,
-              mediaType,
-              cellarNames,
-              wishNames,
-            }),
-          });
-          const results = await shelfRes.json();
-          setShopResults(Array.isArray(results) ? results : []);
-          setState("result");
-        } else if (detectedIntent === "book" || detectedIntent === "winelist") {
-          const bookRes = await fetch("/api/wine/extract-book", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ base64, mediaType }),
-          });
-          const results = await bookRes.json();
-          setBookResults(Array.isArray(results) ? results : []);
+        if (!identRes.ok) {
+          const err = await identRes.json().catch(() => ({}));
+          throw new Error(err.error || `Wine identification failed (${identRes.status})`);
+        }
+        const result = await identRes.json();
+        if (result && !result.error) {
+          result.photoDataUrl = dataUrl;
+          // Auto-suggest fridge
+          const dailyF = fridges.find((f) => f.type === "daily");
+          const cellarF = fridges.find((f) => f.type === "cellar");
+          setSelectedFridge(
+            result.fridgeSuggestion === "daily" && dailyF
+              ? dailyF.id
+              : cellarF?.id || fridges[0]?.id || null
+          );
+          setCameraResult(result);
           setState("result");
         } else {
-          // Fallback to label
-          const identRes = await fetch("/api/wine/identify", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ base64, mediaType }),
-          });
-          const result = await identRes.json();
-          if (result && !result.error) {
-            result.photoDataUrl = dataUrl;
-            setCameraResult(result);
-          }
-          setState("result");
+          throw new Error(result?.error || "Could not identify wine from this photo. Try a clearer shot of the label.");
         }
-      } catch (err) {
-        console.error(err);
-        setCameraError(err instanceof Error ? err.message : "Something went wrong analyzing the photo. Try again.");
-        setState("idle");
+      } else if (detectedIntent === "shelf") {
+        const cellarNames = wines
+          .map((w) => `${w.vintage} ${w.producer} ${w.name}`)
+          .join(", ");
+        const wishNames = wishlist.map((w) => w.name).join(", ");
+        const shelfRes = await fetch("/api/wine/analyze-shelf", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            base64,
+            mediaType,
+            cellarNames,
+            wishNames,
+          }),
+        });
+        if (!shelfRes.ok) {
+          const err = await shelfRes.json().catch(() => ({}));
+          throw new Error(err.error || `Shelf analysis failed (${shelfRes.status})`);
+        }
+        const results = await shelfRes.json();
+        setShopResults(Array.isArray(results) ? results : []);
+        setState("result");
+      } else if (detectedIntent === "book" || detectedIntent === "winelist") {
+        const bookRes = await fetch("/api/wine/extract-book", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ base64, mediaType }),
+        });
+        if (!bookRes.ok) {
+          const err = await bookRes.json().catch(() => ({}));
+          throw new Error(err.error || `Book extraction failed (${bookRes.status})`);
+        }
+        const results = await bookRes.json();
+        setBookResults(Array.isArray(results) ? results : []);
+        setState("result");
+      } else {
+        // Unknown intent — fallback to label identification
+        const identRes = await fetch("/api/wine/identify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ base64, mediaType }),
+        });
+        if (!identRes.ok) {
+          const err = await identRes.json().catch(() => ({}));
+          throw new Error(err.error || `Wine identification failed (${identRes.status})`);
+        }
+        const result = await identRes.json();
+        if (result && !result.error) {
+          result.photoDataUrl = dataUrl;
+          setCameraResult(result);
+          setState("result");
+        } else {
+          throw new Error(result?.error || "Could not identify wine from this photo.");
+        }
       }
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      console.error("Camera error:", err);
+      setCameraError(
+        err instanceof Error
+          ? err.message
+          : "Something went wrong analyzing the photo. Try again."
+      );
+      setState("idle");
+    }
+
     e.target.value = "";
   };
 
@@ -597,6 +651,36 @@ export default function CameraPage() {
             }}
           >
             Done
+          </button>
+        </div>
+      )}
+
+      {/* No results fallback */}
+      {state === "result" && !cameraResult && !shopResults && !bookResults && (
+        <div className="text-center" style={{ padding: "40px 0" }}>
+          <div style={{ fontSize: "48px", marginBottom: "16px" }}>🤷</div>
+          <div
+            className="font-serif"
+            style={{ fontSize: "18px", color: "#2D241B", fontWeight: 600, marginBottom: "8px" }}
+          >
+            Couldn&apos;t identify anything
+          </div>
+          <div style={{ fontSize: "13px", color: "#8C7E72", marginBottom: "24px" }}>
+            Try a clearer photo of a wine label
+          </div>
+          <button
+            onClick={() => setState("idle")}
+            className="cursor-pointer"
+            style={{
+              padding: "12px 32px",
+              background: "#722F37",
+              border: "none",
+              borderRadius: "14px",
+              color: "#FFFFFF",
+              fontSize: "15px",
+            }}
+          >
+            Try Again
           </button>
         </div>
       )}

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { callClaude, parseJSON } from "@/lib/anthropic";
 import { getBookExtractPrompt } from "@/lib/prompts";
 
+export const maxDuration = 30;
+
 export async function POST(req: NextRequest) {
   try {
     const { base64, mediaType } = await req.json();
