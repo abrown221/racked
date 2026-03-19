@@ -10,20 +10,23 @@ export default function CoravinBadge({ wine }: { wine: Wine }) {
 
   return (
     <div
-      className="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs"
+      className="inline-flex items-center gap-1.5 rounded-full text-xs"
       style={{
         background: `${color}15`,
         border: `1px solid ${color}35`,
+        padding: "5px 12px",
       }}
     >
       <div
-        className="w-2 h-2 rounded-full"
+        className="rounded-full"
         style={{
+          width: "7px",
+          height: "7px",
           background: color,
-          boxShadow: `0 0 4px ${color}60`,
+          boxShadow: `0 0 6px ${color}80, 0 0 12px ${color}40`,
         }}
       />
-      <span style={{ color }}>Coravined {days}d ago</span>
+      <span style={{ color, fontWeight: 500 }}>Coravined {days}d ago</span>
     </div>
   );
 }

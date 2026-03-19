@@ -91,7 +91,10 @@ export default function CellarPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen text-[var(--color-text-muted)]">
+      <div
+        className="flex items-center justify-center min-h-screen"
+        style={{ color: "#8C7E72" }}
+      >
         <div className="animate-pulse-slow">Loading...</div>
       </div>
     );
@@ -99,32 +102,53 @@ export default function CellarPage() {
 
   return (
     <>
-      <div className="fade-in px-5 pt-5 pb-24">
-        <h1 className="font-serif text-[30px] font-bold mb-1">Cellar</h1>
-        <div className="text-[13px] text-[var(--color-text-muted)] mb-5">
+      <div className="fade-in" style={{ padding: "24px 20px 112px" }}>
+        {/* Header */}
+        <h1
+          className="font-serif font-bold"
+          style={{
+            fontSize: "32px",
+            color: "#2D241B",
+            letterSpacing: "-0.3px",
+            marginBottom: "4px",
+            lineHeight: 1.15,
+          }}
+        >
+          Cellar
+        </h1>
+        <div
+          style={{
+            fontSize: "13px",
+            color: "#8C7E72",
+            marginBottom: "24px",
+          }}
+        >
           {activeWines.length} bottle{activeWines.length !== 1 ? "s" : ""}
         </div>
 
         {/* Filter pills */}
-        <div className="flex gap-1.5 overflow-x-auto mb-5 pb-1">
+        <div
+          className="flex gap-2 overflow-x-auto"
+          style={{
+            marginBottom: "24px",
+            paddingBottom: "4px",
+            paddingLeft: "2px",
+            paddingRight: "2px",
+          }}
+        >
           {filters.map((f) => (
             <button
               key={f.id}
               onClick={() => setFilter(f.id)}
-              className="whitespace-nowrap px-3.5 py-2 rounded-full text-xs cursor-pointer border"
+              className="whitespace-nowrap cursor-pointer transition-all duration-150"
               style={{
-                borderColor:
-                  filter === f.id
-                    ? "var(--color-accent)"
-                    : "var(--color-border)",
-                background:
-                  filter === f.id
-                    ? "rgba(114,47,55,0.15)"
-                    : "transparent",
-                color:
-                  filter === f.id
-                    ? "var(--color-accent-light)"
-                    : "var(--color-text-muted)",
+                padding: "8px 16px",
+                borderRadius: "100px",
+                fontSize: "12px",
+                fontWeight: 500,
+                border: `1px solid ${filter === f.id ? "#722F37" : "#DDD5CA"}`,
+                background: filter === f.id ? "rgba(114,47,55,0.12)" : "transparent",
+                color: filter === f.id ? "#722F37" : "#8C7E72",
               }}
             >
               {f.label}
@@ -144,26 +168,58 @@ export default function CellarPage() {
             ))}
           </div>
         ) : (
-          <div className="text-center py-16 text-[var(--color-text-muted)]">
+          <div className="text-center" style={{ padding: "64px 20px", color: "#8C7E72" }}>
             {fridges.length === 0 ? (
               <div>
-                <div className="text-5xl mb-4">🍷</div>
-                <div className="font-serif text-lg text-[var(--color-text-primary)] mb-2">
+                <div style={{ fontSize: "48px", marginBottom: "16px" }}>🍷</div>
+                <div
+                  className="font-serif"
+                  style={{
+                    fontSize: "20px",
+                    color: "#2D241B",
+                    marginBottom: "8px",
+                    fontWeight: 600,
+                  }}
+                >
                   Set up your storage first
                 </div>
-                <div className="text-[13px] leading-relaxed mb-5">
+                <div
+                  className="leading-relaxed"
+                  style={{
+                    fontSize: "13px",
+                    color: "#6B5E52",
+                    marginBottom: "20px",
+                  }}
+                >
                   Add your wine fridges in the Profile tab, then start snapping
                   bottles
                 </div>
                 <button
                   onClick={() => router.push("/profile")}
-                  className="px-6 py-3 bg-[var(--color-accent)] border-none rounded-xl text-white text-sm font-semibold cursor-pointer"
+                  className="font-semibold cursor-pointer"
+                  style={{
+                    padding: "12px 28px",
+                    background: "#722F37",
+                    border: "none",
+                    borderRadius: "14px",
+                    color: "#FFFFFF",
+                    fontSize: "14px",
+                    boxShadow: "0 4px 16px rgba(114,47,55,0.25)",
+                  }}
                 >
                   Go to Profile →
                 </button>
               </div>
             ) : (
-              "No wines here yet"
+              <div>
+                <div style={{ fontSize: "40px", marginBottom: "12px", opacity: 0.6 }}>🍷</div>
+                <div
+                  className="font-serif"
+                  style={{ fontSize: "18px", color: "#6B5E52", fontWeight: 500 }}
+                >
+                  No wines here yet
+                </div>
+              </div>
             )}
           </div>
         )}

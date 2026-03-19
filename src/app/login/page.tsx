@@ -14,13 +14,34 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center px-6 max-w-[430px] mx-auto">
-      <div className="text-center mb-12">
-        <div className="text-6xl mb-6">🍷</div>
-        <h1 className="font-serif text-4xl font-bold text-[var(--color-text-primary)] mb-3">
+    <div
+      className="min-h-screen flex flex-col items-center justify-center px-6 max-w-[430px] mx-auto"
+      style={{ background: "#FAF7F2" }}
+    >
+      <div className="text-center mb-14">
+        <div
+          className="text-7xl mb-7"
+          style={{
+            filter: "drop-shadow(0 4px 12px rgba(114,47,55,0.18))",
+          }}
+        >
+          🍷
+        </div>
+        <h1
+          className="font-serif font-bold mb-3"
+          style={{
+            fontSize: "42px",
+            color: "#2D241B",
+            letterSpacing: "-0.5px",
+            lineHeight: 1.1,
+          }}
+        >
           Racked
         </h1>
-        <p className="text-[var(--color-text-muted)] text-base leading-relaxed">
+        <p
+          className="text-base leading-relaxed"
+          style={{ color: "#8C7E72" }}
+        >
           Your personal wine collection,
           <br />
           powered by AI
@@ -29,7 +50,24 @@ export default function LoginPage() {
 
       <button
         onClick={handleGoogleLogin}
-        className="w-full max-w-xs flex items-center justify-center gap-3 px-6 py-4 bg-white border border-[var(--color-border)] rounded-2xl text-[var(--color-text-primary)] font-medium text-base hover:shadow-md transition-shadow cursor-pointer"
+        className="w-full max-w-xs flex items-center justify-center gap-3 px-6 py-4 font-medium text-base cursor-pointer transition-all duration-200"
+        style={{
+          background: "#FFFFFF",
+          border: "1px solid #DDD5CA",
+          borderRadius: "16px",
+          color: "#2D241B",
+          boxShadow: "0 2px 12px rgba(45,36,27,0.06)",
+        }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.boxShadow =
+            "0 4px 20px rgba(45,36,27,0.12)";
+          (e.currentTarget as HTMLButtonElement).style.transform = "translateY(-1px)";
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.boxShadow =
+            "0 2px 12px rgba(45,36,27,0.06)";
+          (e.currentTarget as HTMLButtonElement).style.transform = "translateY(0)";
+        }}
       >
         <svg width="20" height="20" viewBox="0 0 24 24">
           <path
@@ -52,7 +90,10 @@ export default function LoginPage() {
         Continue with Google
       </button>
 
-      <p className="mt-8 text-xs text-[var(--color-text-muted)] text-center leading-relaxed">
+      <p
+        className="mt-10 text-xs text-center leading-relaxed"
+        style={{ color: "#8C7E72" }}
+      >
         By signing in, you agree to our Terms of Service
         <br />
         and Privacy Policy

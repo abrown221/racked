@@ -192,9 +192,20 @@ export default function CameraPage() {
   };
 
   return (
-    <div className="fade-in px-5 pt-5 pb-24">
-      <h1 className="font-serif text-[30px] font-bold mb-1">Camera</h1>
-      <div className="text-[13px] text-[var(--color-text-muted)] mb-7">
+    <div className="fade-in" style={{ padding: "24px 20px 112px" }}>
+      <h1
+        className="font-serif font-bold"
+        style={{
+          fontSize: "32px",
+          color: "#2D241B",
+          letterSpacing: "-0.3px",
+          marginBottom: "4px",
+          lineHeight: 1.15,
+        }}
+      >
+        Camera
+      </h1>
+      <div style={{ fontSize: "13px", color: "#8C7E72", marginBottom: "32px" }}>
         Point at anything wine-related
       </div>
 
@@ -208,19 +219,45 @@ export default function CameraPage() {
       />
 
       {state === "idle" && (
-        <div className="text-center py-10">
+        <div className="text-center" style={{ padding: "40px 0" }}>
           <button
             onClick={() => fileRef.current?.click()}
-            className="w-[140px] h-[140px] rounded-full border-none text-white text-5xl cursor-pointer"
+            className="cursor-pointer flex items-center justify-center"
             style={{
-              background:
-                "linear-gradient(135deg, var(--color-accent), var(--color-accent-light))",
-              boxShadow: "0 8px 40px rgba(114,47,55,0.4)",
+              width: "140px",
+              height: "140px",
+              borderRadius: "50%",
+              border: "none",
+              color: "#FFFFFF",
+              fontSize: "48px",
+              background: "linear-gradient(145deg, #722F37, #8E3A48)",
+              boxShadow:
+                "0 8px 40px rgba(114,47,55,0.35), 0 2px 12px rgba(114,47,55,0.2)",
+              margin: "0 auto",
+              transition: "transform 0.2s, box-shadow 0.2s",
+            }}
+            onMouseEnter={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.transform = "scale(1.05)";
+              (e.currentTarget as HTMLButtonElement).style.boxShadow =
+                "0 12px 48px rgba(114,47,55,0.45), 0 4px 16px rgba(114,47,55,0.3)";
+            }}
+            onMouseLeave={(e) => {
+              (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)";
+              (e.currentTarget as HTMLButtonElement).style.boxShadow =
+                "0 8px 40px rgba(114,47,55,0.35), 0 2px 12px rgba(114,47,55,0.2)";
             }}
           >
             ◉
           </button>
-          <div className="mt-6 text-[var(--color-text-muted)] text-[13px] leading-[1.8]">
+          <div
+            className="leading-relaxed"
+            style={{
+              marginTop: "24px",
+              color: "#8C7E72",
+              fontSize: "13px",
+              lineHeight: 1.8,
+            }}
+          >
             Wine label · Retail shelf · Book page
             <br />
             Receipt · Wine list · Your fridge
@@ -229,12 +266,18 @@ export default function CameraPage() {
       )}
 
       {state === "processing" && (
-        <div className="text-center py-16 text-[var(--color-text-muted)] animate-pulse-slow">
-          <div className="text-5xl mb-4">🔍</div>
-          <div className="font-serif text-lg text-[var(--color-text-primary)]">
+        <div
+          className="text-center animate-pulse-slow"
+          style={{ padding: "64px 0" }}
+        >
+          <div style={{ fontSize: "48px", marginBottom: "16px" }}>🔍</div>
+          <div
+            className="font-serif"
+            style={{ fontSize: "20px", color: "#2D241B", fontWeight: 600 }}
+          >
             Analyzing...
           </div>
-          <div className="text-[13px] mt-2">
+          <div style={{ fontSize: "13px", color: "#8C7E72", marginTop: "8px" }}>
             Claude is figuring out what you&apos;re looking at
           </div>
         </div>
@@ -243,49 +286,70 @@ export default function CameraPage() {
       {/* Label identification result */}
       {state === "result" && cameraResult && (
         <div>
-          <div className="bg-[var(--color-card)] border border-[var(--color-border)] rounded-2xl overflow-hidden mb-5">
+          <div
+            className="overflow-hidden"
+            style={{
+              background: "#FFFFFF",
+              border: "1px solid #DDD5CA",
+              borderRadius: "16px",
+              marginBottom: "20px",
+              boxShadow: "0 2px 12px rgba(45,36,27,0.06)",
+            }}
+          >
             {cameraResult.photoDataUrl && (
               <div
-                className="h-[200px]"
                 style={{
+                  height: "200px",
                   background: `url(${cameraResult.photoDataUrl}) center/cover`,
                 }}
               />
             )}
-            <div className="p-5">
-              <div className="text-[11px] text-[var(--color-gold)] uppercase tracking-wider mb-1.5">
+            <div style={{ padding: "20px" }}>
+              <div
+                style={{
+                  fontSize: "11px",
+                  color: "#A0864E",
+                  textTransform: "uppercase",
+                  letterSpacing: "1.5px",
+                  marginBottom: "6px",
+                  fontWeight: 600,
+                }}
+              >
                 Identified
               </div>
-              <h2 className="font-serif text-[22px] font-bold mb-1">
+              <h2
+                className="font-serif font-bold"
+                style={{ fontSize: "22px", color: "#2D241B", marginBottom: "4px" }}
+              >
                 {cameraResult.vintage} {cameraResult.name}
               </h2>
-              <div className="text-sm text-[var(--color-text-muted)] mb-4">
+              <div style={{ fontSize: "14px", color: "#8C7E72", marginBottom: "16px" }}>
                 {cameraResult.producer} · {cameraResult.varietal}
                 <br />
                 {cameraResult.appellation || cameraResult.region}
               </div>
 
               {cameraResult.drinkingWindow && (
-                <div className="text-[13px] text-[var(--color-text-muted)] mb-3">
+                <div style={{ fontSize: "13px", color: "#6B5E52", marginBottom: "12px" }}>
                   Drinking window: {cameraResult.drinkingWindow.start}–
                   {cameraResult.drinkingWindow.end}
                 </div>
               )}
               {cameraResult.estimatedPrice && (
-                <div className="text-[13px] text-[var(--color-text-muted)] mb-3">
+                <div style={{ fontSize: "13px", color: "#6B5E52", marginBottom: "12px" }}>
                   Market price: ~${cameraResult.estimatedPrice}
                 </div>
               )}
               {cameraResult.fridgeReason && (
-                <div className="text-[13px] text-[var(--color-text-muted)] mb-4">
+                <div style={{ fontSize: "13px", color: "#6B5E52", marginBottom: "16px" }}>
                   💡 {cameraResult.fridgeReason}
                 </div>
               )}
 
               {/* Fridge picker */}
               {fridges.length > 0 ? (
-                <div className="mb-4">
-                  <div className="text-xs text-[var(--color-text-muted)] mb-2">
+                <div style={{ marginBottom: "16px" }}>
+                  <div style={{ fontSize: "12px", color: "#8C7E72", marginBottom: "8px" }}>
                     Which fridge?
                   </div>
                   <div className="flex gap-2 flex-wrap">
@@ -298,30 +362,37 @@ export default function CameraPage() {
                         <button
                           key={f.id}
                           onClick={() => !full && setSelectedFridge(f.id)}
-                          className="flex-[1_1_auto] min-w-[90px] py-2.5 px-2 rounded-xl text-xs cursor-pointer border"
+                          className="text-center cursor-pointer transition-all duration-150"
                           style={{
+                            flex: "1 1 auto",
+                            minWidth: "90px",
+                            padding: "10px 8px",
+                            borderRadius: "14px",
+                            fontSize: "12px",
+                            fontWeight: 500,
                             background:
                               selectedFridge === f.id
-                                ? "rgba(114,47,55,0.22)"
+                                ? "rgba(114,47,55,0.15)"
                                 : "transparent",
-                            borderColor:
+                            border: `1px solid ${
                               selectedFridge === f.id
-                                ? "var(--color-accent)"
+                                ? "#722F37"
                                 : full
                                   ? "rgba(155,51,51,0.25)"
-                                  : "var(--color-border)",
+                                  : "#DDD5CA"
+                            }`,
                             color: full
-                              ? "var(--color-status-red)"
+                              ? "#9B3333"
                               : selectedFridge === f.id
-                                ? "var(--color-accent-light)"
-                                : "var(--color-text-muted)",
+                                ? "#722F37"
+                                : "#8C7E72",
                             opacity: full ? 0.5 : 1,
                             cursor: full ? "not-allowed" : "pointer",
                           }}
                         >
                           {f.name}
                           {f.capacity > 0 && (
-                            <div className="text-[10px] mt-0.5 opacity-70">
+                            <div style={{ fontSize: "10px", marginTop: "2px", opacity: 0.7 }}>
                               {count}/{f.capacity}
                             </div>
                           )}
@@ -331,10 +402,18 @@ export default function CameraPage() {
                   </div>
                 </div>
               ) : (
-                <div className="mb-4">
+                <div style={{ marginBottom: "16px" }}>
                   <button
                     onClick={() => router.push("/profile")}
-                    className="w-full py-3.5 bg-transparent border border-dashed border-[var(--color-border)] rounded-xl text-[var(--color-gold)] text-[13px] cursor-pointer"
+                    className="w-full cursor-pointer"
+                    style={{
+                      padding: "14px",
+                      background: "transparent",
+                      border: "1px dashed #DDD5CA",
+                      borderRadius: "14px",
+                      color: "#A0864E",
+                      fontSize: "13px",
+                    }}
                   >
                     + Add a wine fridge first
                   </button>
@@ -342,8 +421,8 @@ export default function CameraPage() {
               )}
 
               {/* Price */}
-              <div className="mb-4">
-                <div className="text-xs text-[var(--color-text-muted)] mb-2">
+              <div style={{ marginBottom: "16px" }}>
+                <div style={{ fontSize: "12px", color: "#8C7E72", marginBottom: "8px" }}>
                   Price paid (optional)
                 </div>
                 <input
@@ -351,25 +430,53 @@ export default function CameraPage() {
                   value={pricePaid}
                   onChange={(e) => setPricePaid(e.target.value)}
                   placeholder="$"
-                  className="w-full bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-3.5 py-2.5 text-[var(--color-text-primary)] text-sm"
+                  style={{
+                    width: "100%",
+                    background: "#F0EBE3",
+                    border: "1px solid #DDD5CA",
+                    borderRadius: "14px",
+                    padding: "10px 14px",
+                    color: "#2D241B",
+                    fontSize: "14px",
+                    outline: "none",
+                    boxSizing: "border-box",
+                  }}
                 />
               </div>
             </div>
           </div>
 
-          <div className="flex gap-2.5">
+          <div className="flex gap-3">
             <button
               onClick={() => {
                 setState("idle");
                 setCameraResult(null);
               }}
-              className="flex-1 py-3.5 bg-transparent border border-[var(--color-border)] rounded-xl text-[var(--color-text-muted)] text-[15px] cursor-pointer"
+              className="flex-1 cursor-pointer"
+              style={{
+                padding: "14px",
+                background: "transparent",
+                border: "1px solid #DDD5CA",
+                borderRadius: "14px",
+                color: "#6B5E52",
+                fontSize: "15px",
+              }}
             >
               Cancel
             </button>
             <button
               onClick={handleAddToCellar}
-              className="flex-[2] py-3.5 bg-[var(--color-accent)] border-none rounded-xl text-white text-[15px] font-semibold cursor-pointer"
+              className="font-semibold cursor-pointer"
+              style={{
+                flex: 2,
+                padding: "14px",
+                background: "#722F37",
+                border: "none",
+                borderRadius: "14px",
+                color: "#FFFFFF",
+                fontSize: "15px",
+                boxShadow: "0 4px 16px rgba(114,47,55,0.25)",
+              }}
             >
               Add to Cellar
             </button>
@@ -380,36 +487,56 @@ export default function CameraPage() {
       {/* Shop results */}
       {state === "result" && shopResults && (
         <div>
-          <div className="text-[11px] text-[var(--color-gold)] uppercase tracking-wider mb-3">
+          <div
+            style={{
+              fontSize: "11px",
+              color: "#A0864E",
+              textTransform: "uppercase",
+              letterSpacing: "1.5px",
+              marginBottom: "14px",
+              fontWeight: 600,
+            }}
+          >
             Shop Mode — {shopResults.length} wines identified
           </div>
           {shopResults.map((r, i) => (
             <div
               key={i}
-              className="p-4 bg-[var(--color-card)] border rounded-xl mb-2"
               style={{
-                borderColor:
+                padding: "16px",
+                background: "#FFFFFF",
+                borderRadius: "16px",
+                marginBottom: "8px",
+                boxShadow: "0 2px 12px rgba(45,36,27,0.06)",
+                border: `1px solid ${
                   r.recommendation === "buy"
-                    ? "rgba(90,122,74,0.19)"
+                    ? "rgba(90,122,74,0.25)"
                     : r.recommendation === "wishlist-match"
-                      ? "rgba(160,134,78,0.25)"
-                      : "var(--color-border)",
+                      ? "rgba(160,134,78,0.3)"
+                      : "#DDD5CA"
+                }`,
               }}
             >
               <div className="flex justify-between items-start">
                 <div>
-                  <div className="font-serif text-[15px] font-semibold">
+                  <div
+                    className="font-serif font-semibold"
+                    style={{ fontSize: "15px", color: "#2D241B" }}
+                  >
                     {r.name}
                   </div>
                   {r.price && (
-                    <div className="text-[13px] text-[var(--color-text-muted)] mt-0.5">
+                    <div style={{ fontSize: "13px", color: "#8C7E72", marginTop: "2px" }}>
                       {r.price}
                     </div>
                   )}
                 </div>
                 <div
-                  className="text-[11px] px-2.5 py-1 rounded-xl font-semibold uppercase"
+                  className="font-semibold uppercase"
                   style={{
+                    fontSize: "11px",
+                    padding: "4px 10px",
+                    borderRadius: "12px",
                     background:
                       r.recommendation === "buy"
                         ? "rgba(90,122,74,0.12)"
@@ -418,10 +545,10 @@ export default function CameraPage() {
                           : "rgba(140,126,114,0.12)",
                     color:
                       r.recommendation === "buy"
-                        ? "var(--color-status-green)"
+                        ? "#5A7A4A"
                         : r.recommendation === "wishlist-match"
-                          ? "var(--color-gold)"
-                          : "var(--color-text-muted)",
+                          ? "#A0864E"
+                          : "#8C7E72",
                   }}
                 >
                   {r.recommendation === "wishlist-match"
@@ -429,7 +556,7 @@ export default function CameraPage() {
                     : r.recommendation}
                 </div>
               </div>
-              <div className="text-[13px] text-[var(--color-text-muted)] mt-2">
+              <div style={{ fontSize: "13px", color: "#8C7E72", marginTop: "8px" }}>
                 {r.reason}
               </div>
             </div>
@@ -439,7 +566,16 @@ export default function CameraPage() {
               setState("idle");
               setShopResults(null);
             }}
-            className="w-full py-3.5 bg-transparent border border-[var(--color-border)] rounded-xl text-[var(--color-text-muted)] text-[15px] cursor-pointer mt-3"
+            className="w-full cursor-pointer"
+            style={{
+              padding: "14px",
+              background: "transparent",
+              border: "1px solid #DDD5CA",
+              borderRadius: "14px",
+              color: "#6B5E52",
+              fontSize: "15px",
+              marginTop: "12px",
+            }}
           >
             Done
           </button>
@@ -449,21 +585,40 @@ export default function CameraPage() {
       {/* Book results */}
       {state === "result" && bookResults && (
         <div>
-          <div className="text-[11px] text-[var(--color-gold)] uppercase tracking-wider mb-3">
+          <div
+            style={{
+              fontSize: "11px",
+              color: "#A0864E",
+              textTransform: "uppercase",
+              letterSpacing: "1.5px",
+              marginBottom: "14px",
+              fontWeight: 600,
+            }}
+          >
             Book Scan — {bookResults.length} wines found
           </div>
           {bookResults.map((r, i) => (
             <div
               key={i}
-              className="p-4 bg-[var(--color-card)] border border-[var(--color-border)] rounded-xl mb-2"
+              style={{
+                padding: "16px",
+                background: "#FFFFFF",
+                border: "1px solid #DDD5CA",
+                borderRadius: "16px",
+                marginBottom: "8px",
+                boxShadow: "0 2px 12px rgba(45,36,27,0.06)",
+              }}
             >
               <div className="flex justify-between items-start">
                 <div className="flex-1">
-                  <div className="font-serif text-[15px] font-semibold">
+                  <div
+                    className="font-serif font-semibold"
+                    style={{ fontSize: "15px", color: "#2D241B" }}
+                  >
                     {r.name}
                   </div>
                   {r.vintage && (
-                    <div className="text-xs text-[var(--color-text-muted)]">
+                    <div style={{ fontSize: "12px", color: "#8C7E72" }}>
                       {r.vintage}
                     </div>
                   )}
@@ -477,12 +632,24 @@ export default function CameraPage() {
                       search_query: r.searchQuery,
                     })
                   }
-                  className="text-[11px] px-2.5 py-1 rounded-xl border border-[var(--color-gold)] bg-transparent text-[var(--color-gold)] cursor-pointer"
+                  className="cursor-pointer"
+                  style={{
+                    fontSize: "11px",
+                    padding: "5px 12px",
+                    borderRadius: "14px",
+                    border: "1px solid #A0864E",
+                    background: "transparent",
+                    color: "#A0864E",
+                    fontWeight: 500,
+                  }}
                 >
                   + Wish List
                 </button>
               </div>
-              <div className="text-[13px] text-[var(--color-text-muted)] mt-2 leading-relaxed">
+              <div
+                className="leading-relaxed"
+                style={{ fontSize: "13px", color: "#8C7E72", marginTop: "8px" }}
+              >
                 {r.context}
               </div>
             </div>
@@ -492,7 +659,16 @@ export default function CameraPage() {
               setState("idle");
               setBookResults(null);
             }}
-            className="w-full py-3.5 bg-transparent border border-[var(--color-border)] rounded-xl text-[var(--color-text-muted)] text-[15px] cursor-pointer mt-3"
+            className="w-full cursor-pointer"
+            style={{
+              padding: "14px",
+              background: "transparent",
+              border: "1px solid #DDD5CA",
+              borderRadius: "14px",
+              color: "#6B5E52",
+              fontSize: "15px",
+              marginTop: "12px",
+            }}
           >
             Done
           </button>

@@ -50,7 +50,6 @@ export function CellarProvider({ children }: { children: ReactNode }) {
 
   const supabase = createClient();
 
-  // Load cellar on mount
   useEffect(() => {
     async function load() {
       const {
@@ -61,66 +60,97 @@ export function CellarProvider({ children }: { children: ReactNode }) {
         return;
       }
 
-      // Get user's cellar
-      const { data: membership } = await supabase
+      // Ensure profile exists
+      await supabase.from("profiles").upsert(
+        {
+          id: user.id,
+          email: user.email,
+          display_name:
+            user.user_metadata?.full_name || user.email?.split("@")[0],
+        },
+        { onConflict: "id" }
+      );
+
+      // Get user's cellar membership
+      let { data: membership } = await supabase
         .from("cellar_members")
         .select("cellar_id")
         .eq("user_id", user.id)
         .limit(1)
         .single();
 
+      // Auto-create cellar if none exists
+      if (!membership) {
+        const { data: newCellar } = await supabase
+          .from("cellars")
+          .insert({ owner_id: user.id, name: "My Cellar" })
+          .select("id")
+          .single();
+
+        if (newCellar) {
+          await supabase.from("cellar_members").insert({
+            cellar_id: newCellar.id,
+            user_id: user.id,
+            role: "owner",
+            accepted_at: new Date().toISOString(),
+          });
+          membership = { cellar_id: newCellar.id };
+        }
+      }
+
       if (!membership) {
         setLoading(false);
         return;
       }
 
+      const cellarId = membership.cellar_id;
+
+      // Load cellar
       const { data: cellarData } = await supabase
         .from("cellars")
         .select("*")
-        .eq("id", membership.cellar_id)
+        .eq("id", cellarId)
         .single();
 
       if (cellarData) setCellar(cellarData);
 
-      // Load all data in parallel
-      const [winesRes, fridgesRes, wishlistRes, dossiersRes] =
-        await Promise.all([
-          supabase
-            .from("wines")
-            .select("*")
-            .eq("cellar_id", membership.cellar_id)
-            .order("created_at", { ascending: false }),
-          supabase
-            .from("fridges")
-            .select("*")
-            .eq("cellar_id", membership.cellar_id)
-            .order("sort_order"),
-          supabase
-            .from("wishlist")
-            .select("*")
-            .eq("cellar_id", membership.cellar_id)
-            .order("created_at", { ascending: false }),
-          supabase
-            .from("dossiers")
-            .select("*")
-            .in(
-              "wine_id",
-              (
-                await supabase
-                  .from("wines")
-                  .select("id")
-                  .eq("cellar_id", membership.cellar_id)
-              ).data?.map((w) => w.id) || []
-            ),
-        ]);
+      // Load wines, fridges, wishlist in parallel
+      const [winesRes, fridgesRes, wishlistRes] = await Promise.all([
+        supabase
+          .from("wines")
+          .select("*")
+          .eq("cellar_id", cellarId)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("fridges")
+          .select("*")
+          .eq("cellar_id", cellarId)
+          .order("sort_order"),
+        supabase
+          .from("wishlist")
+          .select("*")
+          .eq("cellar_id", cellarId)
+          .order("created_at", { ascending: false }),
+      ]);
 
-      if (winesRes.data) setWines(winesRes.data);
+      const loadedWines = winesRes.data || [];
+      if (loadedWines.length > 0) setWines(loadedWines);
       if (fridgesRes.data) setFridges(fridgesRes.data);
       if (wishlistRes.data) setWishlist(wishlistRes.data);
-      if (dossiersRes.data) {
-        const map: Record<string, Dossier> = {};
-        dossiersRes.data.forEach((d) => (map[d.wine_id] = d));
-        setDossiers(map);
+
+      // Load dossiers for wines (separate query to avoid nested async)
+      if (loadedWines.length > 0) {
+        const wineIds = loadedWines.map((w) => w.id);
+        const { data: dossiersData } = await supabase
+          .from("dossiers")
+          .select("*")
+          .in("wine_id", wineIds);
+
+        if (dossiersData) {
+          const map: Record<string, Dossier> = {};
+          dossiersData.forEach((d) => (map[d.wine_id] = d));
+          setDossiers(map);
+        }
       }
 
       setLoading(false);
@@ -247,7 +277,6 @@ export function CellarProvider({ children }: { children: ReactNode }) {
 
   const deleteFridge = useCallback(
     async (id: string) => {
-      // Unassign wines first
       await supabase
         .from("wines")
         .update({ fridge_id: null })

@@ -7,56 +7,111 @@ export default function WishlistPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen text-[var(--color-text-muted)]">
+      <div
+        className="flex items-center justify-center min-h-screen"
+        style={{ color: "#8C7E72" }}
+      >
         <div className="animate-pulse-slow">Loading...</div>
       </div>
     );
   }
 
   return (
-    <div className="fade-in px-5 pt-5 pb-24">
-      <h1 className="font-serif text-[30px] font-bold mb-1">Wish List</h1>
-      <div className="text-[13px] text-[var(--color-text-muted)] mb-7">
+    <div className="fade-in" style={{ padding: "24px 20px 112px" }}>
+      <h1
+        className="font-serif font-bold"
+        style={{
+          fontSize: "32px",
+          color: "#2D241B",
+          letterSpacing: "-0.3px",
+          marginBottom: "4px",
+          lineHeight: 1.15,
+        }}
+      >
+        Wish List
+      </h1>
+      <div style={{ fontSize: "13px", color: "#8C7E72", marginBottom: "32px" }}>
         {wishlist.length} wine{wishlist.length !== 1 ? "s" : ""} to find
       </div>
 
       {wishlist.length > 0 ? (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2.5">
           {wishlist.map((item) => (
             <div
               key={item.id}
-              className="p-4 bg-[var(--color-card)] border border-[var(--color-border)] rounded-xl"
+              style={{
+                padding: "16px",
+                background: "#FFFFFF",
+                border: "1px solid #DDD5CA",
+                borderRadius: "16px",
+                boxShadow: "0 2px 12px rgba(45,36,27,0.06)",
+              }}
             >
               <div className="flex justify-between items-start">
                 <div className="flex-1 min-w-0">
-                  <div className="font-serif text-[15px] font-semibold">
+                  <div
+                    className="font-serif font-semibold"
+                    style={{ fontSize: "15px", color: "#2D241B" }}
+                  >
                     {item.name}
                   </div>
                   {item.vintage && (
-                    <div className="text-xs text-[var(--color-text-muted)] mt-0.5">
+                    <div style={{ fontSize: "12px", color: "#8C7E72", marginTop: "2px" }}>
                       {item.vintage}
                     </div>
                   )}
                 </div>
                 <button
                   onClick={() => removeWishlistItem(item.id)}
-                  className="text-[var(--color-text-muted)] bg-transparent border-none text-lg cursor-pointer ml-2 hover:text-[var(--color-status-red)]"
+                  className="cursor-pointer transition-colors duration-150"
+                  style={{
+                    background: "transparent",
+                    border: "none",
+                    fontSize: "18px",
+                    color: "#8C7E72",
+                    marginLeft: "8px",
+                    padding: "2px 6px",
+                    borderRadius: "8px",
+                    lineHeight: 1,
+                  }}
+                  onMouseEnter={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.color = "#9B3333";
+                    (e.currentTarget as HTMLButtonElement).style.background = "rgba(155,51,51,0.08)";
+                  }}
+                  onMouseLeave={(e) => {
+                    (e.currentTarget as HTMLButtonElement).style.color = "#8C7E72";
+                    (e.currentTarget as HTMLButtonElement).style.background = "transparent";
+                  }}
                 >
                   ×
                 </button>
               </div>
               {item.context && (
-                <div className="text-[13px] text-[var(--color-text-secondary)] mt-2 leading-relaxed">
+                <div
+                  className="leading-relaxed"
+                  style={{ fontSize: "13px", color: "#6B5E52", marginTop: "8px" }}
+                >
                   {item.context}
                 </div>
               )}
-              <div className="flex items-center gap-2 mt-2.5">
+              <div className="flex items-center gap-2" style={{ marginTop: "10px" }}>
                 {item.source && (
-                  <span className="text-[10px] uppercase tracking-wider text-[var(--color-text-muted)] bg-[var(--color-surface)] px-2 py-0.5 rounded-full">
+                  <span
+                    style={{
+                      fontSize: "10px",
+                      textTransform: "uppercase",
+                      letterSpacing: "0.5px",
+                      color: "#8C7E72",
+                      background: "#F0EBE3",
+                      padding: "3px 10px",
+                      borderRadius: "100px",
+                      fontWeight: 500,
+                    }}
+                  >
                     {item.source}
                   </span>
                 )}
-                <span className="text-[11px] text-[var(--color-text-muted)]">
+                <span style={{ fontSize: "11px", color: "#8C7E72" }}>
                   Added {item.date_added}
                 </span>
               </div>
@@ -64,12 +119,23 @@ export default function WishlistPage() {
           ))}
         </div>
       ) : (
-        <div className="text-center py-16 text-[var(--color-text-muted)]">
-          <div className="text-5xl mb-4">♡</div>
-          <div className="font-serif text-xl text-[var(--color-text-primary)] mb-2">
+        <div className="text-center" style={{ padding: "64px 20px", color: "#8C7E72" }}>
+          <div style={{ fontSize: "48px", marginBottom: "16px", opacity: 0.7 }}>♡</div>
+          <div
+            className="font-serif"
+            style={{
+              fontSize: "22px",
+              color: "#2D241B",
+              marginBottom: "8px",
+              fontWeight: 600,
+            }}
+          >
             No wish list yet
           </div>
-          <div className="text-sm leading-relaxed">
+          <div
+            className="leading-relaxed"
+            style={{ fontSize: "14px", color: "#6B5E52" }}
+          >
             Scan a wine book page or shop shelf to discover wines you want to
             try
           </div>

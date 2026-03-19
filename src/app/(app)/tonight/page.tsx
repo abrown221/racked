@@ -130,7 +130,10 @@ export default function TonightPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen text-[var(--color-text-muted)]">
+      <div
+        className="flex items-center justify-center min-h-screen"
+        style={{ color: "#8C7E72" }}
+      >
         <div className="animate-pulse-slow">Loading your cellar...</div>
       </div>
     );
@@ -138,9 +141,27 @@ export default function TonightPage() {
 
   return (
     <>
-      <div className="fade-in px-5 pt-5 pb-24">
-        <h1 className="font-serif text-[30px] font-bold mb-1">Tonight</h1>
-        <div className="text-[13px] text-[var(--color-text-muted)] mb-7">
+      <div className="fade-in" style={{ padding: "24px 20px 112px" }}>
+        {/* Header */}
+        <h1
+          className="font-serif font-bold"
+          style={{
+            fontSize: "32px",
+            color: "#2D241B",
+            letterSpacing: "-0.3px",
+            marginBottom: "4px",
+            lineHeight: 1.15,
+          }}
+        >
+          Tonight
+        </h1>
+        <div
+          style={{
+            fontSize: "13px",
+            color: "#8C7E72",
+            marginBottom: "32px",
+          }}
+        >
           {new Date().toLocaleDateString("en-US", {
             weekday: "long",
             month: "long",
@@ -150,32 +171,54 @@ export default function TonightPage() {
 
         {/* Coravined */}
         {coravinedWines.length > 0 && (
-          <div className="mb-7">
-            <div className="text-[11px] uppercase tracking-[1.5px] text-[var(--color-text-muted)] mb-3">
+          <div style={{ marginBottom: "32px" }}>
+            <div
+              style={{
+                fontSize: "11px",
+                textTransform: "uppercase",
+                letterSpacing: "1.5px",
+                color: "#8C7E72",
+                marginBottom: "14px",
+              }}
+            >
               Coravined — Finish These
             </div>
             {coravinedWines.map((w) => (
               <div
                 key={w.id}
                 onClick={() => setSelectedWine(w)}
-                className="flex items-center gap-3.5 p-3.5 bg-[var(--color-card)] border border-[rgba(142,58,72,0.19)] rounded-xl mb-2 cursor-pointer"
+                className="flex items-center gap-3.5 cursor-pointer"
+                style={{
+                  padding: "14px",
+                  background: "#FFFFFF",
+                  border: "1px solid rgba(142,58,72,0.19)",
+                  borderRadius: "16px",
+                  marginBottom: "8px",
+                  boxShadow: "0 2px 12px rgba(45,36,27,0.06)",
+                }}
               >
                 <div
-                  className="w-12 h-16 rounded-lg shrink-0"
+                  className="shrink-0"
                   style={{
+                    width: "48px",
+                    height: "64px",
+                    borderRadius: "10px",
                     background: w.photo_url
                       ? `url(${w.photo_url}) center/cover`
-                      : "rgba(114,47,55,0.19)",
+                      : "rgba(114,47,55,0.12)",
                   }}
                 />
                 <div className="flex-1 min-w-0">
-                  <div className="font-serif text-[15px] font-semibold truncate">
+                  <div
+                    className="font-serif font-semibold truncate"
+                    style={{ fontSize: "15px", color: "#2D241B" }}
+                  >
                     {w.vintage} {w.producer}
                   </div>
-                  <div className="text-xs text-[var(--color-text-muted)] mt-0.5">
+                  <div style={{ fontSize: "12px", color: "#8C7E72", marginTop: "2px" }}>
                     {w.varietal}
                   </div>
-                  <div className="mt-1.5">
+                  <div style={{ marginTop: "6px" }}>
                     <CoravinBadge wine={w} />
                   </div>
                 </div>
@@ -186,12 +229,23 @@ export default function TonightPage() {
 
         {/* Recommendations */}
         {activeWines.length > 0 ? (
-          <div className="mb-7">
-            <div className="text-[11px] uppercase tracking-[1.5px] text-[var(--color-text-muted)] mb-3">
+          <div style={{ marginBottom: "32px" }}>
+            <div
+              style={{
+                fontSize: "11px",
+                textTransform: "uppercase",
+                letterSpacing: "1.5px",
+                color: "#8C7E72",
+                marginBottom: "14px",
+              }}
+            >
               Recommended
             </div>
             {loadingRecs ? (
-              <div className="text-center py-10 text-[var(--color-text-muted)] animate-pulse-slow">
+              <div
+                className="text-center animate-pulse-slow"
+                style={{ padding: "40px 0", color: "#8C7E72" }}
+              >
                 Thinking about your cellar...
               </div>
             ) : recommendations.length > 0 ? (
@@ -210,12 +264,26 @@ export default function TonightPage() {
                   <div
                     key={i}
                     onClick={() => match && setSelectedWine(match)}
-                    className="p-4 bg-[var(--color-card)] border border-[var(--color-border)] rounded-xl mb-2 cursor-pointer"
+                    className="cursor-pointer"
+                    style={{
+                      padding: "16px",
+                      background: "#FFFFFF",
+                      border: "1px solid #DDD5CA",
+                      borderRadius: "16px",
+                      marginBottom: "8px",
+                      boxShadow: "0 2px 12px rgba(45,36,27,0.06)",
+                    }}
                   >
-                    <div className="font-serif text-[15px] font-semibold mb-1.5">
+                    <div
+                      className="font-serif font-semibold"
+                      style={{ fontSize: "15px", color: "#2D241B", marginBottom: "6px" }}
+                    >
                       {rec.wine}
                     </div>
-                    <div className="text-[13px] text-[var(--color-text-muted)] leading-relaxed">
+                    <div
+                      className="leading-relaxed"
+                      style={{ fontSize: "13px", color: "#8C7E72" }}
+                    >
                       {rec.reason}
                     </div>
                   </div>
@@ -224,56 +292,130 @@ export default function TonightPage() {
             ) : (
               <div
                 onClick={loadRecommendations}
-                className="text-center py-8 text-[var(--color-text-muted)] cursor-pointer border border-dashed border-[var(--color-border)] rounded-xl"
+                className="text-center cursor-pointer"
+                style={{
+                  padding: "32px 0",
+                  color: "#8C7E72",
+                  border: "1px dashed #DDD5CA",
+                  borderRadius: "16px",
+                }}
               >
                 Tap for recommendations
               </div>
             )}
           </div>
         ) : (
-          <div className="text-center py-16 text-[var(--color-text-muted)]">
-            <div className="text-5xl mb-4">🍷</div>
-            <div className="font-serif text-xl text-[var(--color-text-primary)] mb-2">
-              {fridges.length === 0
-                ? "Welcome to Racked"
-                : "Your cellar is empty"}
+          <div className="text-center" style={{ padding: "64px 20px", color: "#8C7E72" }}>
+            <div style={{ fontSize: "48px", marginBottom: "16px" }}>🍷</div>
+            <div
+              className="font-serif"
+              style={{
+                fontSize: "22px",
+                color: "#2D241B",
+                marginBottom: "8px",
+                fontWeight: 600,
+              }}
+            >
+              {fridges.length === 0 ? "Welcome to Racked" : "Your cellar is empty"}
             </div>
-            <div className="text-sm leading-relaxed">
+            <div
+              className="leading-relaxed"
+              style={{ fontSize: "14px", color: "#6B5E52", marginBottom: "20px" }}
+            >
               {fridges.length === 0
                 ? "Start by adding your wine fridges in Profile, then snap your first bottle"
                 : "Tap the camera below to photograph your first bottle"}
             </div>
+            {fridges.length === 0 && (
+              <button
+                onClick={() => (window.location.href = "/profile")}
+                className="font-semibold cursor-pointer"
+                style={{
+                  padding: "12px 28px",
+                  background: "#722F37",
+                  border: "none",
+                  borderRadius: "14px",
+                  color: "#FFFFFF",
+                  fontSize: "14px",
+                  boxShadow: "0 4px 16px rgba(114,47,55,0.25)",
+                }}
+              >
+                Set Up Fridges →
+              </button>
+            )}
           </div>
         )}
 
         {/* Ask sommelier */}
-        <div className="mb-5">
-          <div className="text-[11px] uppercase tracking-[1.5px] text-[var(--color-text-muted)] mb-3">
+        <div style={{ marginBottom: "20px" }}>
+          <div
+            style={{
+              fontSize: "11px",
+              textTransform: "uppercase",
+              letterSpacing: "1.5px",
+              color: "#8C7E72",
+              marginBottom: "14px",
+            }}
+          >
             Ask Your Sommelier
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2.5 items-stretch">
             <input
               value={askInput}
               onChange={(e) => setAskInput(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && handleAsk()}
               placeholder="What goes with grilled lamb?"
-              className="flex-1 bg-[var(--color-surface)] border border-[var(--color-border)] rounded-xl px-4 py-3 text-[var(--color-text-primary)] text-sm"
+              style={{
+                flex: 1,
+                background: "#F0EBE3",
+                border: "1px solid #DDD5CA",
+                borderRadius: "14px",
+                padding: "12px 16px",
+                color: "#2D241B",
+                fontSize: "14px",
+                outline: "none",
+              }}
             />
             <button
               onClick={handleAsk}
               disabled={askLoading}
-              className="bg-[var(--color-accent)] border-none rounded-xl px-[18px] text-white text-base cursor-pointer disabled:opacity-50"
+              className="flex items-center justify-center cursor-pointer disabled:opacity-50"
+              style={{
+                width: "46px",
+                height: "46px",
+                background: "#722F37",
+                border: "none",
+                borderRadius: "50%",
+                color: "#FFFFFF",
+                fontSize: "18px",
+                flexShrink: 0,
+              }}
             >
               →
             </button>
           </div>
           {askLoading && (
-            <div className="py-4 text-[var(--color-text-muted)] text-[13px] animate-pulse-slow">
+            <div
+              className="animate-pulse-slow"
+              style={{ padding: "16px 0", color: "#8C7E72", fontSize: "13px" }}
+            >
               Thinking...
             </div>
           )}
           {askResponse && (
-            <div className="mt-3 p-4 bg-[var(--color-card)] border border-[var(--color-border)] rounded-xl text-sm text-[var(--color-text-secondary)] leading-relaxed shadow-sm">
+            <div
+              className="leading-relaxed"
+              style={{
+                marginTop: "12px",
+                padding: "16px",
+                background: "#FFFFFF",
+                border: "1px solid #DDD5CA",
+                borderRadius: "16px",
+                fontSize: "14px",
+                color: "#6B5E52",
+                boxShadow: "0 2px 12px rgba(45,36,27,0.06)",
+              }}
+            >
               {askResponse}
             </div>
           )}
