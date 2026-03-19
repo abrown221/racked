@@ -1,0 +1,81 @@
+@import url("https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Libre+Franklin:wght@300;400;500;600&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --font-serif: "Cormorant Garamond", serif;
+  --font-sans: "Libre Franklin", sans-serif;
+
+  /* Palette: The Cellar */
+  --color-bg: #FAF7F2;
+  --color-card: #FFFFFF;
+  --color-surface: #F0EBE3;
+  --color-border: #DDD5CA;
+
+  --color-text-primary: #2D241B;
+  --color-text-secondary: #6B5E52;
+  --color-text-muted: #8C7E72;
+
+  --color-accent: #722F37;
+  --color-accent-light: #8E3A48;
+  --color-gold: #A0864E;
+
+  --color-status-green: #5A7A4A;
+  --color-status-amber: #A07830;
+  --color-status-red: #9B3333;
+  --color-status-blue: #6878A0;
+
+  --color-overlay: rgba(45, 36, 27, 0.75);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-sans);
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  margin: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+input,
+textarea {
+  outline: none;
+}
+
+::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.4s ease both;
+}
+
+.animate-pulse-slow {
+  animation: pulse 1.5s infinite;
+}
