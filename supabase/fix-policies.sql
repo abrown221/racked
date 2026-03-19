@@ -1,16 +1,73 @@
--- Racked: Wine Collection App Schema
--- Run this in Supabase SQL Editor
+-- Racked: Fix RLS Policies Migration
+-- Run this in Supabase SQL Editor to fix the infinite recursion bug
+-- This drops ALL existing policies and recreates them correctly
 
--- 1. Profiles
-CREATE TABLE IF NOT EXISTS profiles (
-  id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  display_name text,
-  email text,
-  created_at timestamptz DEFAULT now()
-);
+-- ============================================
+-- DROP ALL EXISTING POLICIES
+-- ============================================
 
-ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+-- Profiles
+DROP POLICY IF EXISTS "Users can view own profile" ON profiles;
+DROP POLICY IF EXISTS "Users can update own profile" ON profiles;
+DROP POLICY IF EXISTS "Users can insert own profile" ON profiles;
 
+-- Cellars
+DROP POLICY IF EXISTS "Members can view their cellars" ON cellars;
+DROP POLICY IF EXISTS "Users can create cellars" ON cellars;
+DROP POLICY IF EXISTS "Owners can update cellars" ON cellars;
+
+-- Cellar Members (THE BUG WAS HERE - old recursive policy)
+DROP POLICY IF EXISTS "Members can view membership" ON cellar_members;
+DROP POLICY IF EXISTS "Owners can manage members" ON cellar_members;
+DROP POLICY IF EXISTS "Users can insert own membership" ON cellar_members;
+DROP POLICY IF EXISTS "Owners can update members" ON cellar_members;
+DROP POLICY IF EXISTS "Owners can delete members" ON cellar_members;
+
+-- Fridges
+DROP POLICY IF EXISTS "Members can view fridges" ON fridges;
+DROP POLICY IF EXISTS "Editors can manage fridges" ON fridges;
+DROP POLICY IF EXISTS "Editors can insert fridges" ON fridges;
+DROP POLICY IF EXISTS "Editors can update fridges" ON fridges;
+DROP POLICY IF EXISTS "Editors can delete fridges" ON fridges;
+
+-- Wines
+DROP POLICY IF EXISTS "Members can view wines" ON wines;
+DROP POLICY IF EXISTS "Editors can manage wines" ON wines;
+DROP POLICY IF EXISTS "Editors can insert wines" ON wines;
+DROP POLICY IF EXISTS "Editors can update wines" ON wines;
+DROP POLICY IF EXISTS "Editors can delete wines" ON wines;
+
+-- Tasting Notes
+DROP POLICY IF EXISTS "Members can view tasting notes" ON tasting_notes;
+DROP POLICY IF EXISTS "Users can manage own tasting notes" ON tasting_notes;
+DROP POLICY IF EXISTS "Users can insert own tasting notes" ON tasting_notes;
+DROP POLICY IF EXISTS "Users can update own tasting notes" ON tasting_notes;
+DROP POLICY IF EXISTS "Users can delete own tasting notes" ON tasting_notes;
+
+-- Dossiers
+DROP POLICY IF EXISTS "Members can view dossiers" ON dossiers;
+DROP POLICY IF EXISTS "Editors can manage dossiers" ON dossiers;
+DROP POLICY IF EXISTS "Editors can insert dossiers" ON dossiers;
+DROP POLICY IF EXISTS "Editors can update dossiers" ON dossiers;
+
+-- Wishlist
+DROP POLICY IF EXISTS "Members can view wishlist" ON wishlist;
+DROP POLICY IF EXISTS "Editors can manage wishlist" ON wishlist;
+DROP POLICY IF EXISTS "Editors can insert wishlist" ON wishlist;
+DROP POLICY IF EXISTS "Editors can update wishlist" ON wishlist;
+DROP POLICY IF EXISTS "Editors can delete wishlist" ON wishlist;
+
+-- Storage
+DROP POLICY IF EXISTS "Public read access for wine labels" ON storage.objects;
+DROP POLICY IF EXISTS "Authenticated users can upload wine labels" ON storage.objects;
+DROP POLICY IF EXISTS "Users can update own wine label uploads" ON storage.objects;
+DROP POLICY IF EXISTS "Users can delete own wine label uploads" ON storage.objects;
+
+-- ============================================
+-- RECREATE ALL POLICIES (FIXED)
+-- ============================================
+
+-- Profiles
 CREATE POLICY "Users can view own profile"
   ON profiles FOR SELECT
   USING (auth.uid() = id);
@@ -23,30 +80,7 @@ CREATE POLICY "Users can insert own profile"
   ON profiles FOR INSERT
   WITH CHECK (auth.uid() = id);
 
--- 2. Cellars
-CREATE TABLE IF NOT EXISTS cellars (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  owner_id uuid REFERENCES profiles(id) NOT NULL,
-  name text DEFAULT 'My Cellar',
-  created_at timestamptz DEFAULT now()
-);
-
-ALTER TABLE cellars ENABLE ROW LEVEL SECURITY;
-
--- 3. Cellar Members
-CREATE TABLE IF NOT EXISTS cellar_members (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  cellar_id uuid REFERENCES cellars(id) ON DELETE CASCADE NOT NULL,
-  user_id uuid REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
-  role text CHECK (role IN ('owner', 'editor', 'viewer')) DEFAULT 'viewer',
-  invited_at timestamptz DEFAULT now(),
-  accepted_at timestamptz,
-  UNIQUE(cellar_id, user_id)
-);
-
-ALTER TABLE cellar_members ENABLE ROW LEVEL SECURITY;
-
--- Cellar policies (through membership)
+-- Cellars: use owner_id check for INSERT (no membership exists yet)
 CREATE POLICY "Members can view their cellars"
   ON cellars FOR SELECT
   USING (
@@ -66,18 +100,18 @@ CREATE POLICY "Owners can update cellars"
   ON cellars FOR UPDATE
   USING (auth.uid() = owner_id);
 
--- Cellar members policies
--- Users can always view their own memberships
+-- Cellar Members: NO self-referencing queries!
+-- Users can view their own memberships
 CREATE POLICY "Members can view membership"
   ON cellar_members FOR SELECT
   USING (user_id = auth.uid());
 
--- Users can insert their own membership (needed for initial signup flow)
+-- Users can insert their own membership row (needed for signup)
 CREATE POLICY "Users can insert own membership"
   ON cellar_members FOR INSERT
   WITH CHECK (user_id = auth.uid());
 
--- Owners can update/delete members in their cellars
+-- Owners can update members (checked via cellars table, NOT cellar_members)
 CREATE POLICY "Owners can update members"
   ON cellar_members FOR UPDATE
   USING (
@@ -88,6 +122,7 @@ CREATE POLICY "Owners can update members"
     )
   );
 
+-- Owners can delete members (checked via cellars table, NOT cellar_members)
 CREATE POLICY "Owners can delete members"
   ON cellar_members FOR DELETE
   USING (
@@ -98,19 +133,7 @@ CREATE POLICY "Owners can delete members"
     )
   );
 
--- 4. Fridges
-CREATE TABLE IF NOT EXISTS fridges (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  cellar_id uuid REFERENCES cellars(id) ON DELETE CASCADE NOT NULL,
-  name text NOT NULL,
-  capacity int DEFAULT 0,
-  type text CHECK (type IN ('daily', 'cellar', 'mixed')) DEFAULT 'cellar',
-  sort_order int DEFAULT 0,
-  created_at timestamptz DEFAULT now()
-);
-
-ALTER TABLE fridges ENABLE ROW LEVEL SECURITY;
-
+-- Fridges
 CREATE POLICY "Members can view fridges"
   ON fridges FOR SELECT
   USING (
@@ -154,39 +177,7 @@ CREATE POLICY "Editors can delete fridges"
     )
   );
 
--- 5. Wines
-CREATE TABLE IF NOT EXISTS wines (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  cellar_id uuid REFERENCES cellars(id) ON DELETE CASCADE NOT NULL,
-  fridge_id uuid REFERENCES fridges(id) ON DELETE SET NULL,
-  name text NOT NULL,
-  producer text,
-  vintage int,
-  region text,
-  appellation text,
-  varietal text,
-  blend text,
-  alcohol text,
-  estimated_price numeric,
-  price_paid numeric,
-  retailer text,
-  drinking_window_start int,
-  drinking_window_end int,
-  fridge_suggestion text,
-  fridge_reason text,
-  suggested_tags jsonb,
-  status text CHECK (status IN ('sealed', 'coravined', 'consumed')) DEFAULT 'sealed',
-  coravined_date date,
-  consumed_date date,
-  photo_url text,
-  photo_path text,
-  date_added date DEFAULT CURRENT_DATE,
-  created_at timestamptz DEFAULT now(),
-  updated_at timestamptz DEFAULT now()
-);
-
-ALTER TABLE wines ENABLE ROW LEVEL SECURITY;
-
+-- Wines
 CREATE POLICY "Members can view wines"
   ON wines FOR SELECT
   USING (
@@ -230,22 +221,7 @@ CREATE POLICY "Editors can delete wines"
     )
   );
 
--- 6. Tasting Notes
-CREATE TABLE IF NOT EXISTS tasting_notes (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  wine_id uuid REFERENCES wines(id) ON DELETE CASCADE NOT NULL,
-  user_id uuid REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
-  rating int CHECK (rating BETWEEN 1 AND 5),
-  tags jsonb,
-  buy_again text CHECK (buy_again IN ('yes', 'at-this-price', 'no')),
-  notes text,
-  tasted_date date DEFAULT CURRENT_DATE,
-  created_at timestamptz DEFAULT now(),
-  UNIQUE(wine_id, user_id, tasted_date)
-);
-
-ALTER TABLE tasting_notes ENABLE ROW LEVEL SECURITY;
-
+-- Tasting Notes
 CREATE POLICY "Members can view tasting notes"
   ON tasting_notes FOR SELECT
   USING (
@@ -269,21 +245,7 @@ CREATE POLICY "Users can delete own tasting notes"
   ON tasting_notes FOR DELETE
   USING (user_id = auth.uid());
 
--- 7. Dossiers
-CREATE TABLE IF NOT EXISTS dossiers (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  wine_id uuid REFERENCES wines(id) ON DELETE CASCADE NOT NULL UNIQUE,
-  estate text,
-  winemaker text,
-  vinification text,
-  special text,
-  scores jsonb,
-  sentiment text,
-  fetched_at timestamptz DEFAULT now()
-);
-
-ALTER TABLE dossiers ENABLE ROW LEVEL SECURITY;
-
+-- Dossiers
 CREATE POLICY "Members can view dossiers"
   ON dossiers FOR SELECT
   USING (
@@ -319,22 +281,7 @@ CREATE POLICY "Editors can update dossiers"
     )
   );
 
--- 8. Wishlist
-CREATE TABLE IF NOT EXISTS wishlist (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  cellar_id uuid REFERENCES cellars(id) ON DELETE CASCADE NOT NULL,
-  name text NOT NULL,
-  vintage int,
-  context text,
-  source text,
-  search_query text,
-  photo_url text,
-  date_added date DEFAULT CURRENT_DATE,
-  created_at timestamptz DEFAULT now()
-);
-
-ALTER TABLE wishlist ENABLE ROW LEVEL SECURITY;
-
+-- Wishlist
 CREATE POLICY "Members can view wishlist"
   ON wishlist FOR SELECT
   USING (
@@ -378,12 +325,16 @@ CREATE POLICY "Editors can delete wishlist"
     )
   );
 
--- 9. Storage bucket for wine label photos
+-- ============================================
+-- STORAGE
+-- ============================================
+
+-- Create bucket if not exists
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('wine-labels', 'wine-labels', true)
 ON CONFLICT (id) DO NOTHING;
 
--- Storage policies: anyone can view (public bucket), authenticated users can upload
+-- Storage policies
 CREATE POLICY "Public read access for wine labels"
   ON storage.objects FOR SELECT
   USING (bucket_id = 'wine-labels');
@@ -399,3 +350,9 @@ CREATE POLICY "Users can update own wine label uploads"
 CREATE POLICY "Users can delete own wine label uploads"
   ON storage.objects FOR DELETE
   USING (bucket_id = 'wine-labels' AND auth.role() = 'authenticated');
+
+-- ============================================
+-- CLEANUP: Delete any orphaned data from failed signups
+-- ============================================
+DELETE FROM cellar_members WHERE cellar_id NOT IN (SELECT id FROM cellars);
+DELETE FROM cellars WHERE owner_id NOT IN (SELECT id FROM profiles);
