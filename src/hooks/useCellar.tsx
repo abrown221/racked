@@ -77,7 +77,7 @@ export function CellarProvider({ children }: { children: ReactNode }) {
         .select("cellar_id")
         .eq("user_id", user.id)
         .limit(1)
-        .single();
+        .maybeSingle();
 
       // Auto-create cellar if none exists
       if (!membership) {
