@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useCellar } from "@/hooks/useCellar";
 
@@ -39,7 +39,7 @@ type BookResult = {
 /** Resize image to max dimension, return { base64, dataUrl, mediaType } */
 function resizeImage(
   file: File,
-  maxDim = 1200
+  maxDim = 1568
 ): Promise<{ base64: string; dataUrl: string; mediaType: string }> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -64,11 +64,60 @@ function resizeImage(
   });
 }
 
+/** Multi-phase processing indicator */
+function ProcessingIndicator() {
+  const [phase, setPhase] = useState(0);
+  const phases = [
+    { icon: "🔍", text: "Reading the label..." },
+    { icon: "🌐", text: "Searching to verify..." },
+    { icon: "🍷", text: "Building profile..." },
+  ];
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setPhase(1), 3000);
+    const t2 = setTimeout(() => setPhase(2), 8000);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, []);
+
+  const current = phases[phase];
+
+  return (
+    <div className="text-center" style={{ padding: "64px 0" }}>
+      <div style={{ fontSize: "48px", marginBottom: "16px" }}>{current.icon}</div>
+      <div
+        className="font-serif"
+        style={{ fontSize: "20px", color: "#2D241B", fontWeight: 600 }}
+      >
+        Analyzing...
+      </div>
+      <div style={{ fontSize: "13px", color: "#8C7E72", marginTop: "8px" }}>
+        {current.text}
+      </div>
+      <div className="flex justify-center gap-1.5" style={{ marginTop: "20px" }}>
+        {phases.map((_, i) => (
+          <div
+            key={i}
+            style={{
+              width: i <= phase ? "24px" : "8px",
+              height: "8px",
+              borderRadius: "100px",
+              background: i <= phase ? "#722F37" : "#DDD5CA",
+              transition: "all 0.5s ease",
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function CameraPage() {
-  const { wines, fridges, wishlist, addWine, addWishlistItem } = useCellar();
+  const { wines, fridges, wishlist, addWine, addWishlistItem, scanQueueCount, refreshScanQueue } = useCellar();
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
+  const shopModeRef = useRef(false);
 
+  const [mode, setMode] = useState<"single" | "batch">("single");
   const [state, setState] = useState<"idle" | "processing" | "result">("idle");
   const [intent, setIntent] = useState<string | null>(null);
   const [cameraResult, setCameraResult] = useState<CameraResult | null>(null);
@@ -77,10 +126,94 @@ export default function CameraPage() {
   const [selectedFridge, setSelectedFridge] = useState<string | null>(null);
   const [pricePaid, setPricePaid] = useState("");
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editProducer, setEditProducer] = useState("");
+  const [editVintage, setEditVintage] = useState("");
+  const [quantity, setQuantity] = useState(1);
+  const [batchQueued, setBatchQueued] = useState(0);
+  const [batchPending, setBatchPending] = useState(0);
+  const [batchReady, setBatchReady] = useState(scanQueueCount);
+  const [batchFlash, setBatchFlash] = useState(false);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const activeWines = wines.filter((w) => w.status !== "consumed");
 
+  // Keep batchReady in sync with scanQueueCount from context
+  useEffect(() => {
+    setBatchReady(scanQueueCount);
+  }, [scanQueueCount]);
+
+  // Polling effect: process queued photos one at a time
+  useEffect(() => {
+    if (batchPending <= 0 && batchQueued <= 0) return;
+
+    const poll = async () => {
+      try {
+        const res = await fetch("/api/wine/process-next-scan", { method: "POST" });
+        if (!res.ok) return;
+        const data = await res.json();
+        setBatchPending(data.pendingCount || 0);
+        if (data.status === "processed" || data.status === "error") {
+          refreshScanQueue();
+        }
+        if (data.status === "idle" && data.pendingCount === 0) {
+          setBatchQueued(0);
+        }
+      } catch (err) {
+        console.error("Poll error:", err);
+      }
+    };
+
+    // Start immediately, then every 15s
+    poll();
+    pollingRef.current = setInterval(poll, 15000);
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, [batchPending, batchQueued, refreshScanQueue]);
+
+  // Batch mode photo handler — upload instantly, no waiting
+  const handleBatchPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+
+    try {
+      const { base64, mediaType } = await resizeImage(file);
+      setBatchQueued((q) => q + 1);
+
+      // Flash confirmation
+      setBatchFlash(true);
+      setTimeout(() => setBatchFlash(false), 1500);
+
+      const res = await fetch("/api/wine/upload-scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ base64, mediaType }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Upload failed");
+      }
+
+      setBatchPending((p) => p + 1);
+    } catch (err) {
+      console.error("Batch upload error:", err);
+      setCameraError(
+        err instanceof Error ? err.message : "Failed to queue photo"
+      );
+      setBatchQueued((q) => Math.max(0, q - 1));
+    }
+  };
+
   const handlePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Route to batch handler if in batch mode
+    if (mode === "batch") {
+      handleBatchPhoto(e);
+      return;
+    }
+
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -90,44 +223,61 @@ export default function CameraPage() {
     setBookResults(null);
     setIntent(null);
     setCameraError(null);
+    setEditName("");
+    setEditProducer("");
+    setEditVintage("");
+    setQuantity(1);
 
     try {
       // Resize image to prevent oversized payloads
       const { base64, dataUrl, mediaType } = await resizeImage(file);
 
-      // Detect intent
-      const intentRes = await fetch("/api/wine/detect-intent", {
+      // Build context for shelf cross-referencing
+      const cellarNames = wines
+        .map((w) => `${w.vintage} ${w.producer} ${w.name}`)
+        .join(", ");
+      const wishNames = wishlist.map((w) => w.name).join(", ");
+
+      // SINGLE API call — intent detection + analysis in one round trip
+      const forceIntent = shopModeRef.current ? "analyze_shelf" : undefined;
+      shopModeRef.current = false;
+
+      const res = await fetch("/api/wine/analyze-photo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ base64, mediaType }),
+        body: JSON.stringify({ base64, mediaType, cellarNames, wishNames, forceIntent }),
       });
-      if (!intentRes.ok) {
-        const err = await intentRes.json().catch(() => ({}));
-        throw new Error(err.error || `Intent detection failed (${intentRes.status})`);
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Analysis failed (${res.status})`);
       }
-      const { intent: detectedIntent } = await intentRes.json();
+
+      const { intent: detectedIntent, data } = await res.json();
       setIntent(detectedIntent);
 
-      if (
-        detectedIntent === "label" ||
-        detectedIntent === "bottles" ||
-        detectedIntent === "fridge" ||
-        detectedIntent === "other" ||
-        !detectedIntent
-      ) {
-        // Label identification (also fallback for unknown/missing intent)
-        const identRes = await fetch("/api/wine/identify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ base64, mediaType }),
-        });
-        if (!identRes.ok) {
-          const err = await identRes.json().catch(() => ({}));
-          throw new Error(err.error || `Wine identification failed (${identRes.status})`);
-        }
-        const result = await identRes.json();
-        if (result && !result.error) {
-          result.photoDataUrl = dataUrl;
+      switch (detectedIntent) {
+        case "identify_wine": {
+          const result: CameraResult = {
+            name: data.name,
+            producer: data.producer,
+            vintage: data.vintage,
+            region: data.region,
+            appellation: data.appellation,
+            varietal: data.varietal,
+            blend: data.blend,
+            alcohol: data.alcohol,
+            estimatedPrice: data.estimatedPrice,
+            drinkingWindow: {
+              start: data.drinkingWindowStart,
+              end: data.drinkingWindowEnd,
+            },
+            fridgeSuggestion: data.fridgeSuggestion,
+            fridgeReason: data.fridgeReason,
+            suggestedTags: data.suggestedTags,
+            photoDataUrl: dataUrl,
+          };
+
           // Auto-suggest fridge
           const dailyF = fridges.find((f) => f.type === "daily");
           const cellarF = fridges.find((f) => f.type === "cellar");
@@ -137,64 +287,61 @@ export default function CameraPage() {
               : cellarF?.id || fridges[0]?.id || null
           );
           setCameraResult(result);
+          setEditName(result.name);
+          setEditProducer(result.producer);
+          setEditVintage(result.vintage ? String(result.vintage) : "");
+          setQuantity(1);
           setState("result");
-        } else {
-          throw new Error(result?.error || "Could not identify wine from this photo. Try a clearer shot of the label.");
+          break;
         }
-      } else if (detectedIntent === "shelf") {
-        const cellarNames = wines
-          .map((w) => `${w.vintage} ${w.producer} ${w.name}`)
-          .join(", ");
-        const wishNames = wishlist.map((w) => w.name).join(", ");
-        const shelfRes = await fetch("/api/wine/analyze-shelf", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            base64,
-            mediaType,
-            cellarNames,
-            wishNames,
-          }),
-        });
-        if (!shelfRes.ok) {
-          const err = await shelfRes.json().catch(() => ({}));
-          throw new Error(err.error || `Shelf analysis failed (${shelfRes.status})`);
-        }
-        const results = await shelfRes.json();
-        setShopResults(Array.isArray(results) ? results : []);
-        setState("result");
-      } else if (detectedIntent === "book" || detectedIntent === "winelist") {
-        const bookRes = await fetch("/api/wine/extract-book", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ base64, mediaType }),
-        });
-        if (!bookRes.ok) {
-          const err = await bookRes.json().catch(() => ({}));
-          throw new Error(err.error || `Book extraction failed (${bookRes.status})`);
-        }
-        const results = await bookRes.json();
-        setBookResults(Array.isArray(results) ? results : []);
-        setState("result");
-      } else {
-        // Unknown intent — fallback to label identification
-        const identRes = await fetch("/api/wine/identify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ base64, mediaType }),
-        });
-        if (!identRes.ok) {
-          const err = await identRes.json().catch(() => ({}));
-          throw new Error(err.error || `Wine identification failed (${identRes.status})`);
-        }
-        const result = await identRes.json();
-        if (result && !result.error) {
-          result.photoDataUrl = dataUrl;
-          setCameraResult(result);
+
+        case "analyze_shelf": {
+          setShopResults(data.wines || []);
           setState("result");
-        } else {
-          throw new Error(result?.error || "Could not identify wine from this photo.");
+          break;
         }
+
+        case "extract_book": {
+          setBookResults(data.wines || []);
+          setState("result");
+          break;
+        }
+
+        case "scan_collection": {
+          // Multiple bottles found — queue to review system
+          const collectionWines = data.wines || [];
+          if (collectionWines.length > 0) {
+            try {
+              // Upload the photo to storage and create scan_photos record
+              const uploadRes = await fetch("/api/wine/upload-scan", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ base64, mediaType }),
+              });
+              if (uploadRes.ok) {
+                const { scanPhotoId } = await uploadRes.json();
+                // Write the already-analyzed results directly to scan_results
+                await fetch("/api/wine/write-scan-results", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ scanPhotoId, wines: collectionWines }),
+                });
+                await refreshScanQueue();
+              }
+            } catch (err) {
+              console.error("Failed to queue collection results:", err);
+            }
+            setState("idle");
+            router.push("/camera/review");
+          } else {
+            setCameraError("No bottles could be identified in this photo. Try a closer shot.");
+            setState("idle");
+          }
+          break;
+        }
+
+        default:
+          throw new Error(`Unknown analysis type: ${detectedIntent}`);
       }
     } catch (err) {
       console.error("Camera error:", err);
@@ -220,28 +367,32 @@ export default function CameraPage() {
       photoFile = new File([blob], "label.jpg", { type: "image/jpeg" });
     }
 
-    await addWine(
-      {
-        name: cameraResult.name,
-        producer: cameraResult.producer,
-        vintage: cameraResult.vintage,
-        region: cameraResult.region,
-        appellation: cameraResult.appellation,
-        varietal: cameraResult.varietal,
-        blend: cameraResult.blend,
-        alcohol: cameraResult.alcohol,
-        estimated_price: cameraResult.estimatedPrice,
-        drinking_window_start: cameraResult.drinkingWindow?.start,
-        drinking_window_end: cameraResult.drinkingWindow?.end,
-        fridge_suggestion: cameraResult.fridgeSuggestion,
-        fridge_reason: cameraResult.fridgeReason,
-        suggested_tags: cameraResult.suggestedTags,
-        fridge_id: selectedFridge,
-        price_paid: pricePaid ? parseFloat(pricePaid) : null,
-        status: "sealed",
-      },
-      photoFile
-    );
+    const parsedVintage = editVintage ? parseInt(editVintage, 10) : null;
+    const wineData = {
+      name: editName || cameraResult.name,
+      producer: editProducer || cameraResult.producer,
+      vintage: parsedVintage !== null && !isNaN(parsedVintage) ? parsedVintage : cameraResult.vintage,
+      region: cameraResult.region,
+      appellation: cameraResult.appellation,
+      varietal: cameraResult.varietal,
+      blend: cameraResult.blend,
+      alcohol: cameraResult.alcohol,
+      estimated_price: cameraResult.estimatedPrice,
+      drinking_window_start: cameraResult.drinkingWindow?.start,
+      drinking_window_end: cameraResult.drinkingWindow?.end,
+      fridge_suggestion: cameraResult.fridgeSuggestion,
+      fridge_reason: cameraResult.fridgeReason,
+      suggested_tags: cameraResult.suggestedTags,
+      fridge_id: selectedFridge,
+      price_paid: pricePaid ? parseFloat(pricePaid) : null,
+      status: "sealed" as const,
+    };
+
+    // Add N bottles (each gets its own DB row for independent tracking)
+    const count = Math.max(1, Math.min(quantity, 24));
+    for (let i = 0; i < count; i++) {
+      await addWine(wineData, photoFile);
+    }
 
     setState("idle");
     setCameraResult(null);
@@ -262,9 +413,103 @@ export default function CameraPage() {
       >
         Camera
       </h1>
-      <div style={{ fontSize: "13px", color: "#8C7E72", marginBottom: "32px" }}>
+      <div style={{ fontSize: "13px", color: "#8C7E72", marginBottom: "16px" }}>
         Point at anything wine-related
       </div>
+
+      {/* Mode toggle */}
+      <div className="flex gap-1" style={{
+        background: "#F0EBE3",
+        borderRadius: "100px",
+        padding: "3px",
+        marginBottom: "16px",
+      }}>
+        {(["single", "batch"] as const).map((m) => (
+          <button
+            key={m}
+            onClick={() => setMode(m)}
+            className="flex-1 cursor-pointer capitalize"
+            style={{
+              padding: "8px 16px",
+              borderRadius: "100px",
+              fontSize: "13px",
+              fontWeight: 500,
+              border: "none",
+              background: mode === m ? "#FFFFFF" : "transparent",
+              color: mode === m ? "#2D241B" : "#8C7E72",
+              boxShadow: mode === m ? "0 1px 4px rgba(45,36,27,0.1)" : "none",
+              transition: "all 0.2s",
+            }}
+          >
+            {m === "batch" && scanQueueCount > 0 ? `Batch (${scanQueueCount})` : m}
+          </button>
+        ))}
+      </div>
+
+      {/* Batch status bar */}
+      {mode === "batch" && (batchPending > 0 || batchQueued > 0) && (
+        <div style={{
+          padding: "10px 14px",
+          background: "rgba(114,47,55,0.06)",
+          border: "1px solid rgba(114,47,55,0.12)",
+          borderRadius: "14px",
+          marginBottom: "16px",
+          fontSize: "12px",
+          color: "#6B5E52",
+        }}>
+          Processing: {batchQueued > 0 && `${batchQueued} queued`}
+          {batchQueued > 0 && batchPending > 0 && " · "}
+          {batchPending > 0 && `${batchPending} pending`}
+        </div>
+      )}
+
+      {/* Review Queue button */}
+      {scanQueueCount > 0 && (
+        <button
+          onClick={() => router.push("/camera/review")}
+          className="w-full cursor-pointer"
+          style={{
+            padding: "14px 20px",
+            background: "#722F37",
+            border: "none",
+            borderRadius: "14px",
+            color: "#FFFFFF",
+            fontSize: "15px",
+            fontWeight: 600,
+            marginBottom: "16px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            boxShadow: "0 4px 16px rgba(114,47,55,0.25)",
+          }}
+        >
+          <span>Review Queue</span>
+          <span style={{
+            background: "rgba(255,255,255,0.25)",
+            padding: "2px 10px",
+            borderRadius: "100px",
+            fontSize: "13px",
+          }}>
+            {scanQueueCount}
+          </span>
+        </button>
+      )}
+
+      {/* Batch flash confirmation */}
+      {batchFlash && (
+        <div className="text-center" style={{
+          padding: "12px",
+          background: "rgba(90,122,74,0.1)",
+          border: "1px solid rgba(90,122,74,0.25)",
+          borderRadius: "14px",
+          marginBottom: "16px",
+          fontSize: "14px",
+          color: "#5A7A4A",
+          fontWeight: 500,
+        }}>
+          Photo queued!
+        </div>
+      )}
 
       <input
         ref={fileRef}
@@ -331,29 +576,40 @@ export default function CameraPage() {
               lineHeight: 1.8,
             }}
           >
-            Wine label · Retail shelf · Book page
+            Wine label · Book page · Your fridge
             <br />
-            Receipt · Wine list · Your fridge
+            {mode === "batch" ? "Snap multiple photos — review later" : "Tap to scan and identify"}
+          </div>
+
+          {/* Shop Mode button */}
+          <button
+            onClick={() => {
+              shopModeRef.current = true;
+              fileRef.current?.click();
+            }}
+            className="cursor-pointer"
+            style={{
+              marginTop: "20px",
+              padding: "12px 28px",
+              background: "transparent",
+              border: "1px solid #DDD5CA",
+              borderRadius: "100px",
+              color: "#6B5E52",
+              fontSize: "14px",
+              fontWeight: 500,
+              transition: "all 0.2s",
+            }}
+          >
+            🛒 Shop Mode
+          </button>
+          <div style={{ fontSize: "11px", color: "#8C7E72", marginTop: "6px" }}>
+            Photograph a store shelf for buy/skip advice
           </div>
         </div>
       )}
 
       {state === "processing" && (
-        <div
-          className="text-center animate-pulse-slow"
-          style={{ padding: "64px 0" }}
-        >
-          <div style={{ fontSize: "48px", marginBottom: "16px" }}>🔍</div>
-          <div
-            className="font-serif"
-            style={{ fontSize: "20px", color: "#2D241B", fontWeight: 600 }}
-          >
-            Analyzing...
-          </div>
-          <div style={{ fontSize: "13px", color: "#8C7E72", marginTop: "8px" }}>
-            Claude is figuring out what you&apos;re looking at
-          </div>
-        </div>
+        <ProcessingIndicator />
       )}
 
       {/* Label identification result */}
@@ -390,19 +646,128 @@ export default function CameraPage() {
               >
                 Identified
               </div>
-              <h2
-                className="font-serif font-bold"
-                style={{ fontSize: "22px", color: "#2D241B", marginBottom: "4px" }}
-              >
-                {cameraResult.vintage} {cameraResult.name}
-              </h2>
-              <div style={{ fontSize: "14px", color: "#8C7E72", marginBottom: "16px" }}>
-                {cameraResult.producer} · {cameraResult.varietal}
-                <br />
-                {cameraResult.appellation || cameraResult.region}
+
+              {/* Editable wine name */}
+              <input
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="font-serif font-bold w-full"
+                style={{
+                  fontSize: "22px",
+                  color: "#2D241B",
+                  marginBottom: "4px",
+                  background: "transparent",
+                  border: "none",
+                  borderBottom: "1px solid #DDD5CA",
+                  outline: "none",
+                  padding: "2px 0",
+                  boxSizing: "border-box",
+                }}
+              />
+
+              {/* Editable producer + static varietal/appellation */}
+              <div className="flex items-center gap-2" style={{ marginBottom: "4px" }}>
+                <input
+                  type="text"
+                  value={editProducer}
+                  onChange={(e) => setEditProducer(e.target.value)}
+                  className="flex-1"
+                  style={{
+                    fontSize: "14px",
+                    color: "#6B5E52",
+                    background: "transparent",
+                    border: "none",
+                    borderBottom: "1px solid #DDD5CA",
+                    outline: "none",
+                    padding: "2px 0",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+              <div style={{ fontSize: "13px", color: "#8C7E72", marginBottom: "16px" }}>
+                {cameraResult.varietal}
+                {cameraResult.appellation || cameraResult.region
+                  ? ` · ${cameraResult.appellation || cameraResult.region}`
+                  : ""}
               </div>
 
-              {cameraResult.drinkingWindow && (
+              {/* Editable vintage + quantity row */}
+              <div className="flex gap-3" style={{ marginBottom: "16px" }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: "12px", color: "#8C7E72", marginBottom: "6px" }}>
+                    Vintage
+                  </div>
+                  <input
+                    type="number"
+                    value={editVintage}
+                    onChange={(e) => setEditVintage(e.target.value)}
+                    placeholder="NV"
+                    style={{
+                      width: "100%",
+                      background: "#F0EBE3",
+                      border: "1px solid #DDD5CA",
+                      borderRadius: "14px",
+                      padding: "10px 14px",
+                      color: "#2D241B",
+                      fontSize: "14px",
+                      outline: "none",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: "12px", color: "#8C7E72", marginBottom: "6px" }}>
+                    Quantity
+                  </div>
+                  <div className="flex items-center" style={{
+                    background: "#F0EBE3",
+                    border: "1px solid #DDD5CA",
+                    borderRadius: "14px",
+                    overflow: "hidden",
+                  }}>
+                    <button
+                      onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                      className="cursor-pointer"
+                      style={{
+                        width: "40px",
+                        height: "42px",
+                        background: "transparent",
+                        border: "none",
+                        fontSize: "18px",
+                        color: quantity <= 1 ? "#DDD5CA" : "#6B5E52",
+                      }}
+                    >
+                      −
+                    </button>
+                    <div style={{
+                      flex: 1,
+                      textAlign: "center",
+                      fontSize: "15px",
+                      fontWeight: 600,
+                      color: "#2D241B",
+                    }}>
+                      {quantity}
+                    </div>
+                    <button
+                      onClick={() => setQuantity((q) => Math.min(24, q + 1))}
+                      className="cursor-pointer"
+                      style={{
+                        width: "40px",
+                        height: "42px",
+                        background: "transparent",
+                        border: "none",
+                        fontSize: "18px",
+                        color: quantity >= 24 ? "#DDD5CA" : "#6B5E52",
+                      }}
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {cameraResult.drinkingWindow && (cameraResult.drinkingWindow.start || cameraResult.drinkingWindow.end) && (
                 <div style={{ fontSize: "13px", color: "#6B5E52", marginBottom: "12px" }}>
                   Drinking window: {cameraResult.drinkingWindow.start}–
                   {cameraResult.drinkingWindow.end}
@@ -551,7 +916,7 @@ export default function CameraPage() {
                 boxShadow: "0 4px 16px rgba(114,47,55,0.25)",
               }}
             >
-              Add to Cellar
+              Add to Cellar{quantity > 1 ? ` (${quantity})` : ""}
             </button>
           </div>
         </div>

@@ -97,3 +97,38 @@ export type CellarMember = {
   invited_at: string;
   accepted_at: string | null;
 };
+
+export type ScanPhoto = {
+  id: string;
+  cellar_id: string;
+  photo_url: string;
+  photo_path: string;
+  status: "pending" | "processing" | "complete" | "error";
+  error_message: string | null;
+  bottles_found: number;
+  created_at: string;
+};
+
+export type ScanResult = {
+  id: string;
+  cellar_id: string;
+  scan_photo_id: string;
+  status: "pending_review" | "added" | "skipped";
+  confidence: "high" | "medium" | "low";
+  name: string;
+  producer: string | null;
+  vintage: number | null;
+  region: string | null;
+  appellation: string | null;
+  varietal: string | null;
+  blend: string | null;
+  alcohol: string | null;
+  estimated_price: number | null;
+  drinking_window_start: number | null;
+  drinking_window_end: number | null;
+  fridge_suggestion: string | null;
+  fridge_reason: string | null;
+  suggested_tags: string[] | null;
+  duplicate_of: string | null;
+  created_at: string;
+};

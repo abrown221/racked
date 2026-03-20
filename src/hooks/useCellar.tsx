@@ -40,6 +40,7 @@ type CellarContextType = {
   refreshWishlist: () => Promise<void>;
   addWine: (wine: Partial<Wine>, photoFile?: File) => Promise<Wine | null>;
   updateWine: (id: string, updates: Partial<Wine>) => Promise<void>;
+  deleteWine: (id: string) => Promise<void>;
   addFridge: (fridge: Partial<Fridge>) => Promise<void>;
   updateFridge: (id: string, updates: Partial<Fridge>) => Promise<void>;
   deleteFridge: (id: string) => Promise<void>;
@@ -49,6 +50,8 @@ type CellarContextType = {
   getDossier: (wineId: string) => Dossier | undefined;
   saveTastingNote: (wineId: string, data: TastingNoteInput) => Promise<void>;
   loadTastingNotes: (wineId: string) => Promise<void>;
+  scanQueueCount: number;
+  refreshScanQueue: () => Promise<void>;
 };
 
 const CellarContext = createContext<CellarContextType | null>(null);
@@ -62,6 +65,7 @@ export function CellarProvider({ children }: { children: ReactNode }) {
   const [tastingNotes, setTastingNotes] = useState<Record<string, TastingNote[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [scanQueueCount, setScanQueueCount] = useState(0);
 
   const supabase = createClient();
 
@@ -195,6 +199,14 @@ export function CellarProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      // Load scan queue count
+      const { count: scanCount } = await supabase
+        .from("scan_results")
+        .select("*", { count: "exact", head: true })
+        .eq("cellar_id", cellarId)
+        .eq("status", "pending_review");
+      setScanQueueCount(scanCount || 0);
+
       setLoading(false);
     }
     load();
@@ -228,6 +240,16 @@ export function CellarProvider({ children }: { children: ReactNode }) {
       .eq("cellar_id", cellar.id)
       .order("created_at", { ascending: false });
     if (data) setWishlist(data);
+  }, [cellar]);
+
+  const refreshScanQueue = useCallback(async () => {
+    if (!cellar) return;
+    const { count } = await supabase
+      .from("scan_results")
+      .select("*", { count: "exact", head: true })
+      .eq("cellar_id", cellar.id)
+      .eq("status", "pending_review");
+    setScanQueueCount(count || 0);
   }, [cellar]);
 
   const addWine = useCallback(
@@ -293,7 +315,46 @@ export function CellarProvider({ children }: { children: ReactNode }) {
         prev.map((w) => (w.id === id ? { ...w, ...updates } : w))
       );
     },
-    []
+    [],
+  );
+
+  const deleteWine = useCallback(
+    async (id: string) => {
+      // Delete associated photo from storage if it exists
+      const wine = wines.find((w) => w.id === id);
+      if (wine?.photo_path) {
+        await supabase.storage.from("wine-labels").remove([wine.photo_path]);
+      }
+
+      // Delete tasting notes first (foreign key)
+      await supabase.from("tasting_notes").delete().eq("wine_id", id);
+
+      // Delete dossier (foreign key)
+      await supabase.from("dossiers").delete().eq("wine_id", id);
+
+      // Delete the wine
+      const { error: deleteErr } = await supabase
+        .from("wines")
+        .delete()
+        .eq("id", id);
+
+      if (deleteErr) {
+        showError(`Failed to delete wine: ${deleteErr.message}`);
+        return;
+      }
+      setWines((prev) => prev.filter((w) => w.id !== id));
+      setDossiers((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+      setTastingNotes((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    },
+    [wines]
   );
 
   const addFridge = useCallback(
@@ -477,6 +538,7 @@ export function CellarProvider({ children }: { children: ReactNode }) {
         refreshWishlist,
         addWine,
         updateWine,
+        deleteWine,
         addFridge,
         updateFridge,
         deleteFridge,
@@ -486,6 +548,8 @@ export function CellarProvider({ children }: { children: ReactNode }) {
         getDossier,
         saveTastingNote,
         loadTastingNotes,
+        scanQueueCount,
+        refreshScanQueue,
       }}
     >
       {children}
