@@ -308,26 +308,35 @@ export default function CameraPage() {
         }
 
         case "scan_collection": {
-          // Multiple bottles found — show as collection results
-          // Map to ShopResult-like cards for inline review
-          const collectionWines = (data.wines || []).map(
-            (w: {
-              name: string;
-              vintage: number | null;
-              confidence: string;
-              producer: string;
-              varietal: string;
-              estimatedPrice: number | null;
-            }) => ({
-              name: `${w.producer} ${w.name}`,
-              vintage: w.vintage,
-              price: w.estimatedPrice ? `~$${w.estimatedPrice}` : null,
-              recommendation: w.confidence === "low" ? "skip" : "buy",
-              reason: `${w.varietal} · Confidence: ${w.confidence}`,
-            })
-          );
-          setShopResults(collectionWines);
-          setState("result");
+          // Multiple bottles found — queue to review system
+          const collectionWines = data.wines || [];
+          if (collectionWines.length > 0) {
+            try {
+              // Upload the photo to storage and create scan_photos record
+              const uploadRes = await fetch("/api/wine/upload-scan", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ base64, mediaType }),
+              });
+              if (uploadRes.ok) {
+                const { scanPhotoId } = await uploadRes.json();
+                // Write the already-analyzed results directly to scan_results
+                await fetch("/api/wine/write-scan-results", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ scanPhotoId, wines: collectionWines }),
+                });
+                await refreshScanQueue();
+              }
+            } catch (err) {
+              console.error("Failed to queue collection results:", err);
+            }
+            setState("idle");
+            router.push("/camera/review");
+          } else {
+            setCameraError("No bottles could be identified in this photo. Try a closer shot.");
+            setState("idle");
+          }
           break;
         }
 
