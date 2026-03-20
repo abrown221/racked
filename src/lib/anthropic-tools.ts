@@ -29,20 +29,20 @@ export const identifyWineTool = {
         description: "Wine region (e.g. Piedmont, Napa Valley)",
       },
       appellation: {
-        type: ["string", "null"] as const,
-        description: "Specific appellation (e.g. Barolo, Rutherford)",
+        type: "string",
+        description: "Specific appellation if known, or empty string",
       },
       varietal: {
         type: "string",
         description: "Primary grape variety or blend name",
       },
       blend: {
-        type: ["string", "null"] as const,
-        description: "Full blend breakdown if known",
+        type: "string",
+        description: "Full blend breakdown if known, or empty string",
       },
       alcohol: {
-        type: ["string", "null"] as const,
-        description: "ABV if visible on label",
+        type: "string",
+        description: "ABV if visible on label, or empty string",
       },
       estimatedPrice: {
         type: ["number", "null"] as const,
@@ -221,17 +221,17 @@ export const scanCollectionTool = {
             },
             region: { type: "string", description: "Wine region" },
             appellation: {
-              type: ["string", "null"] as const,
-              description: "Specific appellation",
+              type: "string",
+              description: "Specific appellation, or empty string",
             },
             varietal: { type: "string", description: "Primary grape variety" },
             blend: {
-              type: ["string", "null"] as const,
-              description: "Blend breakdown if known",
+              type: "string",
+              description: "Blend breakdown if known, or empty string",
             },
             alcohol: {
-              type: ["string", "null"] as const,
-              description: "ABV if visible",
+              type: "string",
+              description: "ABV if visible, or empty string",
             },
             estimatedPrice: {
               type: ["number", "null"] as const,
