@@ -62,29 +62,31 @@ export async function POST(req: NextRequest) {
 
     const wineName = `${wine.vintage || "NV"} ${wine.producer || ""} ${wine.name}`.trim();
 
-    const prompt = `Research the wine: ${wineName}
+    const prompt = `You must research the wine: ${wineName}
+Region: ${wine.region || "unknown"} | Varietal: ${wine.varietal || "unknown"} | Appellation: ${wine.appellation || "unknown"}
 
-Region: ${wine.region || "unknown"}
-Varietal: ${wine.varietal || "unknown"}
-Appellation: ${wine.appellation || "unknown"}
+IMPORTANT: You MUST perform web searches. Do at least 2 searches:
+1. Search for "${wineName} wine" to find estate info, scores, and reviews
+2. Search for "${wine.producer || ""} ${wine.name} bottle" on vivino.com or wine-searcher.com to find a bottle image URL
 
-Use web search to find accurate information about this wine. Return ONLY valid JSON with no markdown fences, no preamble, no explanation — just the JSON object:
+For the bottle image, look for URLs like:
+- https://images.vivino.com/thumbs/...
+- https://www.wine-searcher.com/images/...
+- Any direct .jpg or .png URL showing the bottle
+
+Return ONLY a JSON object. No markdown fences, no preamble, no commentary — ONLY the JSON:
 
 {
-  "bottleImageUrl": "Direct URL to a product photo of this specific wine bottle from a retailer like wine.com, vivino.com, wine-searcher.com, totalwine.com, or the producer's website. Must be a direct image URL ending in .jpg, .png, or .webp, or from an image CDN. Search for the exact wine name + vintage + 'bottle image'. Return empty string if no good image found.",
-  "estate": "2-3 paragraph history of the estate/vineyard — founding, terroir, what makes the site special",
-  "winemaker": "2-3 paragraph bio of the current winemaker — training, philosophy, career path",
-  "vinification": "Detailed winemaking notes — fermentation, oak, aging, blend rationale",
-  "special": "1-2 paragraph editorial take on why this wine matters, what makes it distinctive",
+  "bottleImageUrl": "direct URL to bottle image from vivino, wine-searcher, or producer site. Empty string only if truly not found after searching.",
+  "estate": "2-3 paragraph history of the estate/vineyard",
+  "winemaker": "2-3 paragraph bio of the current winemaker",
+  "vinification": "detailed winemaking notes",
+  "special": "1-2 paragraph editorial take on why this wine matters",
   "scores": [{"source": "critic name", "score": 92}],
-  "sentiment": "2-3 sentence synthesis of community reception from Vivino, CellarTracker, etc",
+  "sentiment": "2-3 sentence synthesis of community reception",
   "drinkingWindowStart": 2024,
   "drinkingWindowEnd": 2035
-}
-
-For the bottle image: prioritize clear product shots on white or neutral backgrounds. Vivino and wine-searcher tend to have the best bottle images. If you can't find the exact vintage, a recent vintage of the same wine is acceptable.
-
-For drinking windows: if you find professional recommendations, use those. Otherwise estimate based on the wine's style, vintage, and region.`;
+}`;
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -97,7 +99,7 @@ For drinking windows: if you find professional recommendations, use those. Other
         model: "claude-haiku-4-5-20251001",
         max_tokens: 4096,
         tools: [
-          { type: "web_search_20250305", name: "web_search", max_uses: 5 },
+          { type: "web_search_20250305", name: "web_search", max_uses: 8 },
         ],
         messages: [{ role: "user", content: prompt }],
       }),
@@ -241,7 +243,6 @@ For drinking windows: if you find professional recommendations, use those. Other
           {
             wine_id: wineId,
             ...dossierData,
-            created_at: new Date().toISOString(),
           },
           { onConflict: "wine_id" }
         );
