@@ -138,7 +138,7 @@ export async function POST(req: NextRequest) {
             fridge_id: overrides?.fridge_id || null,
             price_paid: overrides?.price_paid || null,
             status: "sealed",
-            photo_url: photoUrl,
+            photo_url: photoUrl || scanResult.bottle_image_url || null,
             photo_path: photoPath,
           })
           .select("id")

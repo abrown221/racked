@@ -188,29 +188,45 @@ export default function CellarPage() {
       <button
         key={group.key}
         onClick={() => setSelectedWine(wine)}
-        className="w-full cursor-pointer text-left"
+        className="w-full cursor-pointer text-left nm-raised-sm"
         style={{
           display: "flex",
           gap: "14px",
           padding: "14px 16px",
-          background: "#FFFFFF",
-          border: `1px solid ${wine.status === "coravined" ? "rgba(142,58,72,0.19)" : "#DDD5CA"}`,
           borderRadius: "16px",
-          boxShadow: "0 1px 6px rgba(45,36,27,0.04)",
           alignItems: "center",
+          transition: "all 0.15s ease",
         }}
       >
         <div
+          className={wine.photo_url ? "" : "nm-inset"}
           style={{
             width: "56px",
             height: "56px",
             borderRadius: "12px",
             flexShrink: 0,
-            background: wine.photo_url
-              ? `url(${wine.photo_url}) center/cover`
-              : "linear-gradient(145deg, rgba(114,47,55,0.08), #F0EBE3 60%)",
+            ...(wine.photo_url
+              ? { background: `url(${wine.photo_url}) center/cover` }
+              : {
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "22px",
+                }),
           }}
-        />
+        >
+          {!wine.photo_url && (
+            <span style={{ opacity: 0.5 }}>
+              {wine.varietal?.toLowerCase().includes("pinot noir") || wine.varietal?.toLowerCase().includes("cabernet") || wine.varietal?.toLowerCase().includes("merlot") || wine.varietal?.toLowerCase().includes("syrah") || wine.varietal?.toLowerCase().includes("malbec") || wine.varietal?.toLowerCase().includes("zinfandel") || wine.varietal?.toLowerCase().includes("sangiovese") || wine.varietal?.toLowerCase().includes("gamay") || wine.varietal?.toLowerCase().includes("red")
+                ? "🍷"
+                : wine.varietal?.toLowerCase().includes("chardonnay") || wine.varietal?.toLowerCase().includes("riesling") || wine.varietal?.toLowerCase().includes("sauvignon") || wine.varietal?.toLowerCase().includes("chenin") || wine.varietal?.toLowerCase().includes("greco")
+                  ? "🥂"
+                  : wine.varietal?.toLowerCase().includes("champagne") || wine.varietal?.toLowerCase().includes("sparkling")
+                    ? "🍾"
+                    : "🍷"}
+            </span>
+          )}
+        </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="flex items-center gap-2">
             <div className="font-serif font-semibold truncate" style={{ fontSize: "14px", color: "#2D241B", flex: 1 }}>
@@ -267,13 +283,13 @@ export default function CellarPage() {
         </div>
 
         {/* Sort toggle */}
-        <div className="flex gap-1" style={{ background: "#F0EBE3", borderRadius: "100px", padding: "3px", marginBottom: "12px" }}>
+        <div className="flex gap-1 nm-inset" style={{ borderRadius: "100px", padding: "4px", marginBottom: "12px" }}>
           {(["region", "urgency"] as const).map((m) => (
-            <button key={m} onClick={() => setSortMode(m)} className="flex-1 cursor-pointer" style={{
+            <button key={m} onClick={() => setSortMode(m)} className={`flex-1 cursor-pointer ${sortMode === m ? "nm-raised-sm" : ""}`} style={{
               padding: "8px 16px", borderRadius: "100px", fontSize: "13px", fontWeight: 500,
-              border: "none", background: sortMode === m ? "#FFFFFF" : "transparent",
+              border: "none", background: sortMode === m ? "#EDE8E0" : "transparent",
               color: sortMode === m ? "#2D241B" : "#8C7E72",
-              boxShadow: sortMode === m ? "0 1px 4px rgba(45,36,27,0.1)" : "none", transition: "all 0.2s",
+              transition: "all 0.2s",
             }}>
               {m === "region" ? "By Region" : "By Urgency"}
             </button>
@@ -283,10 +299,10 @@ export default function CellarPage() {
         {/* Filter pills */}
         <div className="flex gap-2 overflow-x-auto" style={{ marginBottom: "20px", paddingBottom: "4px", paddingLeft: "2px", paddingRight: "2px" }}>
           {filters.map((f) => (
-            <button key={f.id} onClick={() => setFilter(f.id)} className="whitespace-nowrap cursor-pointer transition-all duration-150" style={{
+            <button key={f.id} onClick={() => setFilter(f.id)} className={`whitespace-nowrap cursor-pointer transition-all duration-150 ${filter === f.id ? "nm-raised-sm" : ""}`} style={{
               padding: "7px 14px", borderRadius: "100px", fontSize: "12px", fontWeight: 500,
-              border: `1px solid ${filter === f.id ? "#722F37" : "#DDD5CA"}`,
-              background: filter === f.id ? "rgba(114,47,55,0.12)" : "transparent",
+              border: "none",
+              background: filter === f.id ? "#EDE8E0" : "transparent",
               color: filter === f.id ? "#722F37" : "#8C7E72",
             }}>
               {f.label}

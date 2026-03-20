@@ -281,8 +281,8 @@ export function CellarProvider({ children }: { children: ReactNode }) {
         .insert({
           ...wine,
           cellar_id: cellar.id,
-          photo_url,
-          photo_path,
+          photo_url: photo_url || wine.photo_url || null,
+          photo_path: photo_path || wine.photo_path || null,
         })
         .select()
         .single();

@@ -19,6 +19,7 @@ type CameraResult = {
   fridgeReason: string;
   suggestedTags: string[];
   photoDataUrl?: string;
+  bottleImageUrl?: string;
 };
 
 type ShopResult = {
@@ -134,6 +135,7 @@ export default function CameraPage() {
   const [batchPending, setBatchPending] = useState(0);
   const [batchReady, setBatchReady] = useState(scanQueueCount);
   const [batchFlash, setBatchFlash] = useState(false);
+  const [duplicateWine, setDuplicateWine] = useState<{ name: string; count: number } | null>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const activeWines = wines.filter((w) => w.status !== "consumed");
@@ -227,6 +229,7 @@ export default function CameraPage() {
     setEditProducer("");
     setEditVintage("");
     setQuantity(1);
+    setDuplicateWine(null);
 
     try {
       // Resize image to prevent oversized payloads
@@ -276,6 +279,7 @@ export default function CameraPage() {
             fridgeReason: data.fridgeReason,
             suggestedTags: data.suggestedTags,
             photoDataUrl: dataUrl,
+            bottleImageUrl: data.bottleImageUrl || undefined,
           };
 
           // Auto-suggest fridge
@@ -291,6 +295,29 @@ export default function CameraPage() {
           setEditProducer(result.producer);
           setEditVintage(result.vintage ? String(result.vintage) : "");
           setQuantity(1);
+
+          // Duplicate detection against cellar
+          const normalize = (s: string) =>
+            s.toLowerCase().trim()
+              .replace(/château|chateau/gi, "chateau")
+              .replace(/domaine/gi, "domaine")
+              .replace(/['']/g, "'");
+          const matchingWines = activeWines.filter((w) => {
+            const nameMatch = normalize(result.name) === normalize(w.name);
+            const producerMatch =
+              !result.producer || !w.producer ||
+              normalize(result.producer) === normalize(w.producer);
+            return nameMatch && producerMatch;
+          });
+          if (matchingWines.length > 0) {
+            setDuplicateWine({
+              name: matchingWines[0].name,
+              count: matchingWines.length,
+            });
+          } else {
+            setDuplicateWine(null);
+          }
+
           setState("result");
           break;
         }
@@ -386,6 +413,7 @@ export default function CameraPage() {
       fridge_id: selectedFridge,
       price_paid: pricePaid ? parseFloat(pricePaid) : null,
       status: "sealed" as const,
+      photo_url: cameraResult.bottleImageUrl || null,
     };
 
     // Add N bottles (each gets its own DB row for independent tracking)
@@ -418,26 +446,24 @@ export default function CameraPage() {
       </div>
 
       {/* Mode toggle */}
-      <div className="flex gap-1" style={{
-        background: "#F0EBE3",
+      <div className="flex gap-1 nm-inset" style={{
         borderRadius: "100px",
-        padding: "3px",
+        padding: "4px",
         marginBottom: "16px",
       }}>
         {(["single", "batch"] as const).map((m) => (
           <button
             key={m}
             onClick={() => setMode(m)}
-            className="flex-1 cursor-pointer capitalize"
+            className={`flex-1 cursor-pointer capitalize ${mode === m ? "nm-raised-sm" : ""}`}
             style={{
               padding: "8px 16px",
               borderRadius: "100px",
               fontSize: "13px",
               fontWeight: 500,
               border: "none",
-              background: mode === m ? "#FFFFFF" : "transparent",
+              background: mode === m ? "#EDE8E0" : "transparent",
               color: mode === m ? "#2D241B" : "#8C7E72",
-              boxShadow: mode === m ? "0 1px 4px rgba(45,36,27,0.1)" : "none",
               transition: "all 0.2s",
             }}
           >
@@ -646,6 +672,23 @@ export default function CameraPage() {
               >
                 Identified
               </div>
+
+              {/* Duplicate warning */}
+              {duplicateWine && (
+                <div
+                  style={{
+                    padding: "10px 14px",
+                    background: "rgba(160,134,78,0.1)",
+                    border: "1px solid rgba(160,134,78,0.25)",
+                    borderRadius: "12px",
+                    marginBottom: "12px",
+                    fontSize: "13px",
+                    color: "#A07830",
+                  }}
+                >
+                  Already in cellar{duplicateWine.count > 1 ? ` (×${duplicateWine.count})` : ""} — {duplicateWine.name}
+                </div>
+              )}
 
               {/* Editable wine name */}
               <input

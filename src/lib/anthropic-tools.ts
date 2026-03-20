@@ -71,6 +71,11 @@ export const identifyWineTool = {
         items: { type: "string" },
         description: "5 flavor/character tags for this wine",
       },
+      bottleImageUrl: {
+        type: "string",
+        description:
+          "URL to a reference bottle image found during web search. Look for a clear product shot from a retailer like wine.com, vivino.com, wine-searcher.com, or a producer website. Return empty string if no good image found.",
+      },
     },
     required: [
       "name",
@@ -87,6 +92,7 @@ export const identifyWineTool = {
       "fridgeSuggestion",
       "fridgeReason",
       "suggestedTags",
+      "bottleImageUrl",
     ],
     additionalProperties: false,
   },
@@ -262,12 +268,16 @@ export const scanCollectionTool = {
               items: { type: "string" },
               description: "5 flavor/character tags",
             },
+            bottleImageUrl: {
+              type: "string",
+              description: "URL to a reference bottle image from web search, or empty string",
+            },
           },
           required: [
             "confidence", "name", "producer", "vintage", "region",
             "appellation", "varietal", "blend", "alcohol",
             "estimatedPrice", "drinkingWindowStart", "drinkingWindowEnd",
-            "fridgeSuggestion", "fridgeReason", "suggestedTags",
+            "fridgeSuggestion", "fridgeReason", "suggestedTags", "bottleImageUrl",
           ],
           additionalProperties: false,
         },
