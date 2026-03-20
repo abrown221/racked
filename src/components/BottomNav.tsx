@@ -20,7 +20,7 @@ export default function BottomNav() {
     <nav
       className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] z-50"
       style={{
-        background: "#EDE8E0",
+        background: "#FAF7F2",
         borderTop: "none",
         boxShadow: "0 -4px 16px rgba(166,157,145,0.25)",
       }}

@@ -5,11 +5,11 @@
   --font-serif: "Cormorant Garamond", serif;
   --font-sans: "Libre Franklin", sans-serif;
 
-  /* Palette: The Cellar — warm parchment base */
-  --color-bg: #EDE8E0;
-  --color-card: #EDE8E0;
-  --color-surface: #E4DFD6;
-  --color-border: #D4CDC3;
+  /* Palette: The Cellar — warm cream base */
+  --color-bg: #FAF7F2;
+  --color-card: #FAF7F2;
+  --color-surface: #F0EBE3;
+  --color-border: #DDD5CA;
 
   --color-text-primary: #2D241B;
   --color-text-secondary: #6B5E52;
@@ -54,18 +54,18 @@ textarea {
 /* ═══ Neumorphic shadow system ═══ */
 
 .nm-raised {
-  background: #EDE8E0;
+  background: #FAF7F2;
   box-shadow:
-    6px 6px 14px rgba(166, 157, 145, 0.45),
-    -6px -6px 14px rgba(255, 255, 255, 0.75);
+    6px 6px 14px rgba(180, 170, 158, 0.4),
+    -6px -6px 14px rgba(255, 255, 255, 0.8);
   border: none;
 }
 
 .nm-raised-sm {
-  background: #EDE8E0;
+  background: #FAF7F2;
   box-shadow:
-    3px 3px 8px rgba(166, 157, 145, 0.35),
-    -3px -3px 8px rgba(255, 255, 255, 0.65);
+    3px 3px 8px rgba(180, 170, 158, 0.3),
+    -3px -3px 8px rgba(255, 255, 255, 0.7);
   border: none;
 }
 
@@ -79,22 +79,22 @@ textarea {
 
 .nm-inset {
   box-shadow:
-    inset 3px 3px 7px rgba(166, 157, 145, 0.4),
-    inset -3px -3px 7px rgba(255, 255, 255, 0.6);
+    inset 3px 3px 7px rgba(180, 170, 158, 0.35),
+    inset -3px -3px 7px rgba(255, 255, 255, 0.65);
   border: none;
-  background: #E6E1D8;
+  background: #F0EBE3;
 }
 
 .nm-flat {
-  background: #EDE8E0;
+  background: #FAF7F2;
   box-shadow: none;
   border: none;
 }
 
 .nm-pressed {
   box-shadow:
-    inset 2px 2px 5px rgba(166, 157, 145, 0.5),
-    inset -2px -2px 5px rgba(255, 255, 255, 0.5);
+    inset 2px 2px 5px rgba(180, 170, 158, 0.45),
+    inset -2px -2px 5px rgba(255, 255, 255, 0.55);
 }
 
 /* ═══ Animations ═══ */

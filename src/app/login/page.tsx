@@ -17,7 +17,7 @@ export default function LoginPage() {
   return (
     <div
       className="min-h-screen flex flex-col items-center justify-center px-8 max-w-[430px] mx-auto"
-      style={{ background: "#EDE8E0" }}
+      style={{ background: "#FAF7F2" }}
     >
       {/* Logo */}
       <div

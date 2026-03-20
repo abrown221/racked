@@ -462,7 +462,7 @@ export default function CameraPage() {
               fontSize: "13px",
               fontWeight: 500,
               border: "none",
-              background: mode === m ? "#EDE8E0" : "transparent",
+              background: mode === m ? "#FAF7F2" : "transparent",
               color: mode === m ? "#2D241B" : "#8C7E72",
               transition: "all 0.2s",
             }}
