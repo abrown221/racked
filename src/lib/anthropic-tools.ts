@@ -1,5 +1,5 @@
 // Tool schemas and tool-based Anthropic API calls for the camera module.
-// Uses strict: true for guaranteed JSON schema compliance via constrained decoding.
+// Tool schemas guide Claude's structured output. Sonnet 4.6 follows schemas accurately.
 // No parseJSON() needed — tool_use.input is already a validated JS object.
 
 // ─── Tool Definitions ───────────────────────────────────────────────
@@ -8,7 +8,7 @@ export const identifyWineTool = {
   name: "identify_wine",
   description:
     "Identify a wine from a photo of a bottle label, multiple bottles, an open fridge with bottles, or any image where wine bottles are the primary subject. IMPORTANT: Labels can be hard to read — always use web search to verify the wine name and producer actually exist before returning data. Search for the wine to confirm spelling, and to find accurate pricing, drinking windows, and region details. If multiple bottles are visible, identify the most prominent one.",
-  strict: true,
+
   input_schema: {
     type: "object" as const,
     properties: {
@@ -96,7 +96,7 @@ export const analyzeShelfTool = {
   name: "analyze_shelf",
   description:
     "Analyze a photo of a retail wine shelf, store display, or shop section. Identify all visible wines and provide buy/skip recommendations. Use web search to verify current pricing and ratings when helpful. Cross-reference against the user's cellar and wish list provided in the system prompt.",
-  strict: true,
+
   input_schema: {
     type: "object" as const,
     properties: {
@@ -143,7 +143,7 @@ export const extractBookTool = {
   name: "extract_book",
   description:
     "Extract wine and producer mentions from a photo of a wine book page, magazine article, wine list, or menu. For each wine mentioned, summarize what the source says about it and provide a search query for finding it online.",
-  strict: true,
+
   input_schema: {
     type: "object" as const,
     properties: {
@@ -191,7 +191,7 @@ export const scanCollectionTool = {
     "Mark confidence 'high' if label is clearly readable, 'medium' if fairly sure but label is at an angle, " +
     "'low' if guessing from partial information. " +
     "Report the total number of bottles visible (including unidentifiable ones) and the number you could identify.",
-  strict: true,
+
   input_schema: {
     type: "object" as const,
     properties: {
