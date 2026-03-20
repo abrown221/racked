@@ -83,7 +83,6 @@ export default function CellarPage() {
 
   // Enrich all wines missing photos or dossiers
   const handleEnrichAll = useCallback(async () => {
-    // Find unique wines that need enrichment (one per group to avoid duplicates)
     const seen = new Set<string>();
     const needsEnrich: Wine[] = [];
     for (const wine of activeWines) {
@@ -100,11 +99,16 @@ export default function CellarPage() {
 
     setEnriching(true);
     setEnrichProgress({ done: 0, total: needsEnrich.length, current: "" });
+    let errors = 0;
 
     for (let i = 0; i < needsEnrich.length; i++) {
       const wine = needsEnrich[i];
       const label = `${wine.vintage || "NV"} ${wine.producer || ""} ${wine.name}`.trim();
-      setEnrichProgress({ done: i, total: needsEnrich.length, current: label });
+      setEnrichProgress({
+        done: i,
+        total: needsEnrich.length,
+        current: errors > 0 ? `${label} (${errors} failed)` : label,
+      });
 
       try {
         const res = await fetch("/api/wine/enrich", {
@@ -114,17 +118,28 @@ export default function CellarPage() {
         });
 
         if (!res.ok) {
+          errors++;
           const err = await res.json().catch(() => ({}));
-          console.error("Enrich failed for", label, err.error);
+          console.error("Enrich failed for", label, err.error || res.status);
         }
       } catch (err) {
+        errors++;
         console.error("Enrich failed for", label, err);
+      }
+
+      // Refresh UI every 5 wines so user sees progress
+      if ((i + 1) % 5 === 0) {
+        await refreshWines();
       }
     }
 
-    setEnrichProgress({ done: needsEnrich.length, total: needsEnrich.length, current: "Done!" });
+    setEnrichProgress({
+      done: needsEnrich.length,
+      total: needsEnrich.length,
+      current: errors > 0 ? `Done — ${errors} failed` : "Done!",
+    });
     await refreshWines();
-    setTimeout(() => setEnriching(false), 1500);
+    setTimeout(() => setEnriching(false), 2000);
   }, [activeWines, getDossier, refreshWines]);
 
   const filters = [
@@ -383,7 +398,7 @@ export default function CellarPage() {
         </div>
 
         {/* Refresh / Enrich button */}
-        {!enriching && activeWines.some((w) => !w.photo_url) && (
+        {!enriching && activeWines.some((w) => !w.photo_url || !getDossier(w.id)) && (
           <button
             onClick={handleEnrichAll}
             className="w-full cursor-pointer nm-raised-sm"

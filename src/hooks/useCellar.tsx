@@ -219,7 +219,22 @@ export function CellarProvider({ children }: { children: ReactNode }) {
       .select("*")
       .eq("cellar_id", cellar.id)
       .order("created_at", { ascending: false });
-    if (data) setWines(data);
+    if (data) {
+      setWines(data);
+      // Also refresh dossiers
+      const wineIds = data.map((w) => w.id);
+      if (wineIds.length > 0) {
+        const { data: dossiersData } = await supabase
+          .from("dossiers")
+          .select("*")
+          .in("wine_id", wineIds);
+        if (dossiersData) {
+          const map: Record<string, Dossier> = {};
+          dossiersData.forEach((d) => (map[d.wine_id] = d));
+          setDossiers(map);
+        }
+      }
+    }
   }, [cellar]);
 
   const refreshFridges = useCallback(async () => {

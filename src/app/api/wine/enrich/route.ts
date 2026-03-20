@@ -147,11 +147,20 @@ For drinking windows: if you find professional recommendations, use those. Other
     }
 
     if (!parsed) {
+      console.error("[enrich] JSON parse failed. Raw text:", textBlocks.slice(0, 500));
       return NextResponse.json(
         { error: "Failed to parse AI response" },
         { status: 422 }
       );
     }
+
+    console.log("[enrich] Parsed", {
+      wineId,
+      wineName,
+      hasImage: !!parsed.bottleImageUrl,
+      hasEstate: !!parsed.estate,
+      imageUrl: parsed.bottleImageUrl?.slice(0, 80),
+    });
 
     let updatedImage = false;
     let updatedDossier = false;
@@ -173,10 +182,14 @@ For drinking windows: if you find professional recommendations, use those. Other
       wineUpdates.drinking_window_end = parsed.drinkingWindowEnd;
     }
 
-    await supabase
+    const { error: wineUpdateErr } = await supabase
       .from("wines")
       .update(wineUpdates)
       .eq("id", wineId);
+
+    if (wineUpdateErr) {
+      console.error("[enrich] Wine update failed:", wineUpdateErr.message);
+    }
 
     // Propagate image to sibling bottles (same name/producer/vintage, no photo)
     if (updatedImage && parsed.bottleImageUrl && wine.name) {
@@ -222,15 +235,22 @@ For drinking windows: if you find professional recommendations, use those. Other
         sentiment: parsed.sentiment || null,
       };
 
-      await supabase
+      const { error: dossierErr } = await supabase
         .from("dossiers")
-        .upsert({
-          wine_id: wineId,
-          ...dossierData,
-          created_at: new Date().toISOString(),
-        });
+        .upsert(
+          {
+            wine_id: wineId,
+            ...dossierData,
+            created_at: new Date().toISOString(),
+          },
+          { onConflict: "wine_id" }
+        );
 
-      updatedDossier = true;
+      if (dossierErr) {
+        console.error("[enrich] Dossier save failed:", dossierErr.message);
+      } else {
+        updatedDossier = true;
+      }
     }
 
     console.log("[enrich] Complete", {
