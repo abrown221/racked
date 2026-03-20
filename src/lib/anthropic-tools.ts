@@ -366,17 +366,23 @@ export async function callClaudeWithTools({
     );
   }
 
+  // Only include analyze_shelf when user explicitly tapped Shop Mode.
+  // This prevents Claude from choosing shop mode for home wine racks.
+  const toolSet: unknown[] = [
+    { type: "web_search_20250305", name: "web_search", max_uses: 8 },
+    identifyWineTool,
+    scanCollectionTool,
+    extractBookTool,
+  ];
+  if (forceIntent === "analyze_shelf") {
+    toolSet.push(analyzeShelfTool);
+  }
+
   const body = {
     model: "claude-sonnet-4-6",
     max_tokens: 8192,
     system: systemParts.join("\n"),
-    tools: [
-      { type: "web_search_20250305", name: "web_search", max_uses: 8 },
-      identifyWineTool,
-      scanCollectionTool,
-      analyzeShelfTool,
-      extractBookTool,
-    ],
+    tools: toolSet,
     tool_choice: forceIntent
       ? { type: "tool" as const, name: forceIntent, disable_parallel_tool_use: true }
       : { type: "any" as const, disable_parallel_tool_use: true },
