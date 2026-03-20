@@ -77,6 +77,10 @@ export default function CameraPage() {
   const [selectedFridge, setSelectedFridge] = useState<string | null>(null);
   const [pricePaid, setPricePaid] = useState("");
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [editName, setEditName] = useState("");
+  const [editProducer, setEditProducer] = useState("");
+  const [editVintage, setEditVintage] = useState("");
+  const [quantity, setQuantity] = useState(1);
 
   const activeWines = wines.filter((w) => w.status !== "consumed");
 
@@ -90,6 +94,10 @@ export default function CameraPage() {
     setBookResults(null);
     setIntent(null);
     setCameraError(null);
+    setEditName("");
+    setEditProducer("");
+    setEditVintage("");
+    setQuantity(1);
 
     try {
       // Resize image to prevent oversized payloads
@@ -147,6 +155,10 @@ export default function CameraPage() {
               : cellarF?.id || fridges[0]?.id || null
           );
           setCameraResult(result);
+          setEditName(result.name);
+          setEditProducer(result.producer);
+          setEditVintage(result.vintage ? String(result.vintage) : "");
+          setQuantity(1);
           setState("result");
           break;
         }
@@ -190,28 +202,32 @@ export default function CameraPage() {
       photoFile = new File([blob], "label.jpg", { type: "image/jpeg" });
     }
 
-    await addWine(
-      {
-        name: cameraResult.name,
-        producer: cameraResult.producer,
-        vintage: cameraResult.vintage,
-        region: cameraResult.region,
-        appellation: cameraResult.appellation,
-        varietal: cameraResult.varietal,
-        blend: cameraResult.blend,
-        alcohol: cameraResult.alcohol,
-        estimated_price: cameraResult.estimatedPrice,
-        drinking_window_start: cameraResult.drinkingWindow?.start,
-        drinking_window_end: cameraResult.drinkingWindow?.end,
-        fridge_suggestion: cameraResult.fridgeSuggestion,
-        fridge_reason: cameraResult.fridgeReason,
-        suggested_tags: cameraResult.suggestedTags,
-        fridge_id: selectedFridge,
-        price_paid: pricePaid ? parseFloat(pricePaid) : null,
-        status: "sealed",
-      },
-      photoFile
-    );
+    const parsedVintage = editVintage ? parseInt(editVintage, 10) : null;
+    const wineData = {
+      name: editName || cameraResult.name,
+      producer: editProducer || cameraResult.producer,
+      vintage: parsedVintage !== null && !isNaN(parsedVintage) ? parsedVintage : cameraResult.vintage,
+      region: cameraResult.region,
+      appellation: cameraResult.appellation,
+      varietal: cameraResult.varietal,
+      blend: cameraResult.blend,
+      alcohol: cameraResult.alcohol,
+      estimated_price: cameraResult.estimatedPrice,
+      drinking_window_start: cameraResult.drinkingWindow?.start,
+      drinking_window_end: cameraResult.drinkingWindow?.end,
+      fridge_suggestion: cameraResult.fridgeSuggestion,
+      fridge_reason: cameraResult.fridgeReason,
+      suggested_tags: cameraResult.suggestedTags,
+      fridge_id: selectedFridge,
+      price_paid: pricePaid ? parseFloat(pricePaid) : null,
+      status: "sealed" as const,
+    };
+
+    // Add N bottles (each gets its own DB row for independent tracking)
+    const count = Math.max(1, Math.min(quantity, 24));
+    for (let i = 0; i < count; i++) {
+      await addWine(wineData, photoFile);
+    }
 
     setState("idle");
     setCameraResult(null);
@@ -360,19 +376,128 @@ export default function CameraPage() {
               >
                 Identified
               </div>
-              <h2
-                className="font-serif font-bold"
-                style={{ fontSize: "22px", color: "#2D241B", marginBottom: "4px" }}
-              >
-                {cameraResult.vintage} {cameraResult.name}
-              </h2>
-              <div style={{ fontSize: "14px", color: "#8C7E72", marginBottom: "16px" }}>
-                {cameraResult.producer} · {cameraResult.varietal}
-                <br />
-                {cameraResult.appellation || cameraResult.region}
+
+              {/* Editable wine name */}
+              <input
+                type="text"
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="font-serif font-bold w-full"
+                style={{
+                  fontSize: "22px",
+                  color: "#2D241B",
+                  marginBottom: "4px",
+                  background: "transparent",
+                  border: "none",
+                  borderBottom: "1px solid #DDD5CA",
+                  outline: "none",
+                  padding: "2px 0",
+                  boxSizing: "border-box",
+                }}
+              />
+
+              {/* Editable producer + static varietal/appellation */}
+              <div className="flex items-center gap-2" style={{ marginBottom: "4px" }}>
+                <input
+                  type="text"
+                  value={editProducer}
+                  onChange={(e) => setEditProducer(e.target.value)}
+                  className="flex-1"
+                  style={{
+                    fontSize: "14px",
+                    color: "#6B5E52",
+                    background: "transparent",
+                    border: "none",
+                    borderBottom: "1px solid #DDD5CA",
+                    outline: "none",
+                    padding: "2px 0",
+                    boxSizing: "border-box",
+                  }}
+                />
+              </div>
+              <div style={{ fontSize: "13px", color: "#8C7E72", marginBottom: "16px" }}>
+                {cameraResult.varietal}
+                {cameraResult.appellation || cameraResult.region
+                  ? ` · ${cameraResult.appellation || cameraResult.region}`
+                  : ""}
               </div>
 
-              {cameraResult.drinkingWindow && (
+              {/* Editable vintage + quantity row */}
+              <div className="flex gap-3" style={{ marginBottom: "16px" }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: "12px", color: "#8C7E72", marginBottom: "6px" }}>
+                    Vintage
+                  </div>
+                  <input
+                    type="number"
+                    value={editVintage}
+                    onChange={(e) => setEditVintage(e.target.value)}
+                    placeholder="NV"
+                    style={{
+                      width: "100%",
+                      background: "#F0EBE3",
+                      border: "1px solid #DDD5CA",
+                      borderRadius: "14px",
+                      padding: "10px 14px",
+                      color: "#2D241B",
+                      fontSize: "14px",
+                      outline: "none",
+                      boxSizing: "border-box",
+                    }}
+                  />
+                </div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: "12px", color: "#8C7E72", marginBottom: "6px" }}>
+                    Quantity
+                  </div>
+                  <div className="flex items-center" style={{
+                    background: "#F0EBE3",
+                    border: "1px solid #DDD5CA",
+                    borderRadius: "14px",
+                    overflow: "hidden",
+                  }}>
+                    <button
+                      onClick={() => setQuantity((q) => Math.max(1, q - 1))}
+                      className="cursor-pointer"
+                      style={{
+                        width: "40px",
+                        height: "42px",
+                        background: "transparent",
+                        border: "none",
+                        fontSize: "18px",
+                        color: quantity <= 1 ? "#DDD5CA" : "#6B5E52",
+                      }}
+                    >
+                      −
+                    </button>
+                    <div style={{
+                      flex: 1,
+                      textAlign: "center",
+                      fontSize: "15px",
+                      fontWeight: 600,
+                      color: "#2D241B",
+                    }}>
+                      {quantity}
+                    </div>
+                    <button
+                      onClick={() => setQuantity((q) => Math.min(24, q + 1))}
+                      className="cursor-pointer"
+                      style={{
+                        width: "40px",
+                        height: "42px",
+                        background: "transparent",
+                        border: "none",
+                        fontSize: "18px",
+                        color: quantity >= 24 ? "#DDD5CA" : "#6B5E52",
+                      }}
+                    >
+                      +
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {cameraResult.drinkingWindow && (cameraResult.drinkingWindow.start || cameraResult.drinkingWindow.end) && (
                 <div style={{ fontSize: "13px", color: "#6B5E52", marginBottom: "12px" }}>
                   Drinking window: {cameraResult.drinkingWindow.start}–
                   {cameraResult.drinkingWindow.end}
@@ -521,7 +646,7 @@ export default function CameraPage() {
                 boxShadow: "0 4px 16px rgba(114,47,55,0.25)",
               }}
             >
-              Add to Cellar
+              Add to Cellar{quantity > 1 ? ` (${quantity})` : ""}
             </button>
           </div>
         </div>

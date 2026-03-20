@@ -7,7 +7,7 @@
 export const identifyWineTool = {
   name: "identify_wine",
   description:
-    "Identify a wine from a photo of a bottle label, multiple bottles, an open fridge with bottles, or any image where wine bottles are the primary subject. Extract all available metadata from the visible label. If multiple bottles are visible, identify the most prominent one.",
+    "Identify a wine from a photo of a bottle label, multiple bottles, an open fridge with bottles, or any image where wine bottles are the primary subject. IMPORTANT: Labels can be hard to read — always use web search to verify the wine name and producer actually exist before returning data. Search for the wine to confirm spelling, and to find accurate pricing, drinking windows, and region details. If multiple bottles are visible, identify the most prominent one.",
   strict: true,
   input_schema: {
     type: "object" as const,
@@ -223,6 +223,12 @@ export async function callClaudeWithTools({
     "- identify_wine: for photos of wine bottle labels, bottles on a counter, bottles in a fridge, or any image where wine bottles are the primary subject",
     "- analyze_shelf: for photos of retail store shelves, wine shop displays, or store aisles with price tags visible",
     "- extract_book: for photos of book pages, magazine articles, wine lists, restaurant menus, or any printed text about wine",
+    "",
+    "CRITICAL: For wine identification, ALWAYS use web search to verify the wine exists before returning data.",
+    "Labels are often hard to read — letters can look similar (e.g. 'l' vs 'f', 'n' vs 'r').",
+    "Search for what you think the wine is, confirm the correct spelling of the producer and wine name,",
+    "and use the search results to fill in accurate pricing, drinking windows, and regional details.",
+    "Never guess a wine name without verifying it exists via search.",
     "",
     "You MUST call exactly one tool. Choose the best match for what you see.",
   ];
