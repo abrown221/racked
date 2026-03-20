@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useCellar } from "@/hooks/useCellar";
 
@@ -62,6 +62,53 @@ function resizeImage(
     img.onerror = () => reject(new Error("Failed to load image"));
     img.src = URL.createObjectURL(file);
   });
+}
+
+/** Multi-phase processing indicator */
+function ProcessingIndicator() {
+  const [phase, setPhase] = useState(0);
+  const phases = [
+    { icon: "🔍", text: "Reading the label..." },
+    { icon: "🌐", text: "Searching to verify..." },
+    { icon: "🍷", text: "Building profile..." },
+  ];
+
+  useEffect(() => {
+    const t1 = setTimeout(() => setPhase(1), 3000);
+    const t2 = setTimeout(() => setPhase(2), 8000);
+    return () => { clearTimeout(t1); clearTimeout(t2); };
+  }, []);
+
+  const current = phases[phase];
+
+  return (
+    <div className="text-center" style={{ padding: "64px 0" }}>
+      <div style={{ fontSize: "48px", marginBottom: "16px" }}>{current.icon}</div>
+      <div
+        className="font-serif"
+        style={{ fontSize: "20px", color: "#2D241B", fontWeight: 600 }}
+      >
+        Analyzing...
+      </div>
+      <div style={{ fontSize: "13px", color: "#8C7E72", marginTop: "8px" }}>
+        {current.text}
+      </div>
+      <div className="flex justify-center gap-1.5" style={{ marginTop: "20px" }}>
+        {phases.map((_, i) => (
+          <div
+            key={i}
+            style={{
+              width: i <= phase ? "24px" : "8px",
+              height: "8px",
+              borderRadius: "100px",
+              background: i <= phase ? "#722F37" : "#DDD5CA",
+              transition: "all 0.5s ease",
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
 }
 
 export default function CameraPage() {
@@ -325,21 +372,7 @@ export default function CameraPage() {
       )}
 
       {state === "processing" && (
-        <div
-          className="text-center animate-pulse-slow"
-          style={{ padding: "64px 0" }}
-        >
-          <div style={{ fontSize: "48px", marginBottom: "16px" }}>🔍</div>
-          <div
-            className="font-serif"
-            style={{ fontSize: "20px", color: "#2D241B", fontWeight: 600 }}
-          >
-            Analyzing...
-          </div>
-          <div style={{ fontSize: "13px", color: "#8C7E72", marginTop: "8px" }}>
-            Claude is figuring out what you&apos;re looking at
-          </div>
-        </div>
+        <ProcessingIndicator />
       )}
 
       {/* Label identification result */}

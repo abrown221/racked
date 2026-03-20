@@ -42,8 +42,14 @@ export default function WineCard({
           {wine.vintage} {wine.producer}
         </div>
         <div
+          className="truncate"
+          style={{ fontSize: "12px", color: "#6B5E52", marginTop: "2px" }}
+        >
+          {wine.name}
+        </div>
+        <div
           className="mt-1 truncate"
-          style={{ fontSize: "12px", color: "#8C7E72" }}
+          style={{ fontSize: "11px", color: "#8C7E72" }}
         >
           {wine.varietal} · {wine.appellation || wine.region}
         </div>

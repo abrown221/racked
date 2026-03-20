@@ -9,7 +9,7 @@ import TastingFlow from "@/components/TastingFlow";
 import type { Wine } from "@/lib/supabase/types";
 
 export default function CellarPage() {
-  const { wines, fridges, tastingNotes, loading, updateWine, saveDossier, getDossier, saveTastingNote, loadTastingNotes } =
+  const { wines, fridges, tastingNotes, loading, updateWine, deleteWine, saveDossier, getDossier, saveTastingNote, loadTastingNotes } =
     useCellar();
   const router = useRouter();
   const [selectedWine, setSelectedWine] = useState<Wine | null>(null);
@@ -86,7 +86,9 @@ export default function CellarPage() {
       if (data && !data.error) {
         await saveDossier(wine.id, data);
       }
-    } catch {}
+    } catch (err) {
+      console.error("Research error:", err);
+    }
     setResearchingWineId(null);
   };
 
@@ -238,6 +240,14 @@ export default function CellarPage() {
           onCoravin={handleCoravin}
           onResearch={() => handleResearch(selectedWine)}
           onLoadNotes={() => loadTastingNotes(selectedWine.id)}
+          onDelete={(wine) => {
+            deleteWine(wine.id);
+            setSelectedWine(null);
+          }}
+          onUpdate={(id, updates) => {
+            updateWine(id, updates);
+            setSelectedWine((prev) => prev ? { ...prev, ...updates } : null);
+          }}
         />
       )}
 
@@ -245,13 +255,7 @@ export default function CellarPage() {
         <TastingFlow
           wine={tastingWine}
           onSave={handleTastingSave}
-          onCancel={() => {
-            updateWine(tastingWine.id, {
-              status: "consumed",
-              consumed_date: new Date().toISOString().split("T")[0],
-            });
-            setTastingWine(null);
-          }}
+          onCancel={() => setTastingWine(null)}
         />
       )}
     </>

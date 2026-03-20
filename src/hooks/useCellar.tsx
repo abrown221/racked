@@ -40,6 +40,7 @@ type CellarContextType = {
   refreshWishlist: () => Promise<void>;
   addWine: (wine: Partial<Wine>, photoFile?: File) => Promise<Wine | null>;
   updateWine: (id: string, updates: Partial<Wine>) => Promise<void>;
+  deleteWine: (id: string) => Promise<void>;
   addFridge: (fridge: Partial<Fridge>) => Promise<void>;
   updateFridge: (id: string, updates: Partial<Fridge>) => Promise<void>;
   deleteFridge: (id: string) => Promise<void>;
@@ -293,7 +294,46 @@ export function CellarProvider({ children }: { children: ReactNode }) {
         prev.map((w) => (w.id === id ? { ...w, ...updates } : w))
       );
     },
-    []
+    [],
+  );
+
+  const deleteWine = useCallback(
+    async (id: string) => {
+      // Delete associated photo from storage if it exists
+      const wine = wines.find((w) => w.id === id);
+      if (wine?.photo_path) {
+        await supabase.storage.from("wine-labels").remove([wine.photo_path]);
+      }
+
+      // Delete tasting notes first (foreign key)
+      await supabase.from("tasting_notes").delete().eq("wine_id", id);
+
+      // Delete dossier (foreign key)
+      await supabase.from("dossiers").delete().eq("wine_id", id);
+
+      // Delete the wine
+      const { error: deleteErr } = await supabase
+        .from("wines")
+        .delete()
+        .eq("id", id);
+
+      if (deleteErr) {
+        showError(`Failed to delete wine: ${deleteErr.message}`);
+        return;
+      }
+      setWines((prev) => prev.filter((w) => w.id !== id));
+      setDossiers((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+      setTastingNotes((prev) => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+    },
+    [wines]
   );
 
   const addFridge = useCallback(
@@ -477,6 +517,7 @@ export function CellarProvider({ children }: { children: ReactNode }) {
         refreshWishlist,
         addWine,
         updateWine,
+        deleteWine,
         addFridge,
         updateFridge,
         deleteFridge,

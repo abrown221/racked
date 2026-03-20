@@ -18,6 +18,7 @@ export default function TonightPage() {
     tastingNotes,
     loading,
     updateWine,
+    deleteWine,
     saveDossier,
     getDossier,
     saveTastingNote,
@@ -446,6 +447,14 @@ export default function TonightPage() {
           onCoravin={handleCoravin}
           onResearch={() => handleResearch(selectedWine)}
           onLoadNotes={() => loadTastingNotes(selectedWine.id)}
+          onDelete={(wine) => {
+            deleteWine(wine.id);
+            setSelectedWine(null);
+          }}
+          onUpdate={(id, updates) => {
+            updateWine(id, updates);
+            setSelectedWine((prev) => prev ? { ...prev, ...updates } : null);
+          }}
         />
       )}
 
@@ -453,13 +462,7 @@ export default function TonightPage() {
         <TastingFlow
           wine={tastingWine}
           onSave={handleTastingSave}
-          onCancel={() => {
-            updateWine(tastingWine.id, {
-              status: "consumed",
-              consumed_date: new Date().toISOString().split("T")[0],
-            });
-            setTastingWine(null);
-          }}
+          onCancel={() => setTastingWine(null)}
         />
       )}
     </>

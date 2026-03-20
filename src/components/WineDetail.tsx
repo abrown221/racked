@@ -20,7 +20,11 @@ type Props = {
   onCoravin: (wine: Wine) => void;
   onResearch: () => void;
   onLoadNotes: () => void;
+  onDelete: (wine: Wine) => void;
+  onUpdate: (id: string, updates: Partial<Wine>) => void;
 };
+
+type ConfirmAction = "consume" | "coravin" | "delete" | null;
 
 export default function WineDetail({
   wine,
@@ -33,9 +37,21 @@ export default function WineDetail({
   onCoravin,
   onResearch,
   onLoadNotes,
+  onDelete,
+  onUpdate,
 }: Props) {
   const [tab, setTab] = useState<"overview" | "dossier" | "notes">("overview");
   const [notesLoaded, setNotesLoaded] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
+  const [editing, setEditing] = useState(false);
+  const [showFridgePicker, setShowFridgePicker] = useState(false);
+  const [editName, setEditName] = useState(wine.name);
+  const [editProducer, setEditProducer] = useState(wine.producer || "");
+  const [editVintage, setEditVintage] = useState(wine.vintage ? String(wine.vintage) : "");
+  const [editVarietal, setEditVarietal] = useState(wine.varietal || "");
+  const [editRegion, setEditRegion] = useState(wine.region || "");
+  const [editPricePaid, setEditPricePaid] = useState(wine.price_paid ? String(wine.price_paid) : "");
+
   const windowStatus = getDrinkingWindowStatus(wine);
   const windowColor = WINDOW_COLORS[windowStatus];
 
@@ -45,6 +61,75 @@ export default function WineDetail({
       setNotesLoaded(true);
     }
   }, [tab, notesLoaded, onLoadNotes]);
+
+  const handleConfirm = () => {
+    if (confirmAction === "consume") onConsume(wine);
+    if (confirmAction === "coravin") onCoravin(wine);
+    if (confirmAction === "delete") {
+      onDelete(wine);
+      onClose();
+    }
+    setConfirmAction(null);
+  };
+
+  const handleSaveEdit = () => {
+    const parsedVintage = editVintage ? parseInt(editVintage, 10) : null;
+    onUpdate(wine.id, {
+      name: editName,
+      producer: editProducer || null,
+      vintage: parsedVintage !== null && !isNaN(parsedVintage) ? parsedVintage : null,
+      varietal: editVarietal || null,
+      region: editRegion || null,
+      price_paid: editPricePaid ? parseFloat(editPricePaid) : null,
+    });
+    setEditing(false);
+  };
+
+  const handleRestore = () => {
+    onUpdate(wine.id, {
+      status: "sealed",
+      consumed_date: null,
+      coravined_date: null,
+    });
+  };
+
+  const handleFridgeSelect = (fridgeId: string | null) => {
+    onUpdate(wine.id, { fridge_id: fridgeId });
+    setShowFridgePicker(false);
+  };
+
+  const confirmMessages: Record<string, { title: string; message: string; button: string; color: string }> = {
+    consume: {
+      title: "Mark as consumed?",
+      message: "This will open the tasting flow to rate and review this wine.",
+      button: "Yes, I drank it",
+      color: "#722F37",
+    },
+    coravin: {
+      title: "Mark as Coravined?",
+      message: "This will start tracking the Coravin runway for this bottle.",
+      button: "Yes, Coravined",
+      color: "#2D241B",
+    },
+    delete: {
+      title: "Delete this wine?",
+      message: "This will permanently remove this wine, its photo, dossier, and tasting notes. This can't be undone.",
+      button: "Delete",
+      color: "#9B3333",
+    },
+  };
+
+  const inputStyle = {
+    width: "100%",
+    background: "#F0EBE3",
+    border: "1px solid #DDD5CA",
+    borderRadius: "14px",
+    padding: "10px 14px",
+    color: "#2D241B",
+    fontSize: "14px",
+    outline: "none",
+    boxSizing: "border-box" as const,
+  };
 
   return (
     <div
@@ -87,23 +172,158 @@ export default function WineDetail({
         >
           ←
         </button>
+        {/* Top-right actions: edit + delete */}
+        <div className="absolute flex gap-2" style={{ top: "16px", right: "16px" }}>
+          <button
+            onClick={() => setEditing(!editing)}
+            className="flex items-center justify-center cursor-pointer"
+            style={{
+              width: "38px",
+              height: "38px",
+              borderRadius: "50%",
+              background: editing ? "rgba(114,47,55,0.6)" : "rgba(45,36,27,0.35)",
+              backdropFilter: "blur(16px)",
+              WebkitBackdropFilter: "blur(16px)",
+              border: "1px solid rgba(255,255,255,0.15)",
+              color: "#FFFFFF",
+              fontSize: "16px",
+            }}
+          >
+            ✎
+          </button>
+          <button
+            onClick={() => setConfirmAction("delete")}
+            className="flex items-center justify-center cursor-pointer"
+            style={{
+              width: "38px",
+              height: "38px",
+              borderRadius: "50%",
+              background: "rgba(45,36,27,0.35)",
+              backdropFilter: "blur(16px)",
+              WebkitBackdropFilter: "blur(16px)",
+              border: "1px solid rgba(255,255,255,0.15)",
+              color: "#FFFFFF",
+              fontSize: "16px",
+            }}
+          >
+            ×
+          </button>
+        </div>
       </div>
 
       <div style={{ padding: "0 20px 120px" }}>
-        {/* Name */}
-        <h1
-          className="font-serif font-bold leading-tight"
-          style={{ fontSize: "28px", color: "#2D241B", marginBottom: "4px" }}
-        >
-          {wine.vintage} {wine.name}
-        </h1>
-        <div style={{ fontSize: "15px", color: "#8C7E72", marginBottom: "14px" }}>
-          {wine.producer} · {wine.appellation || wine.region}
-        </div>
+        {/* Name section — editable or static */}
+        {editing ? (
+          <div style={{ marginBottom: "14px" }}>
+            <input
+              type="text"
+              value={editName}
+              onChange={(e) => setEditName(e.target.value)}
+              placeholder="Wine name"
+              className="font-serif font-bold w-full"
+              style={{ ...inputStyle, fontSize: "22px", marginBottom: "8px" }}
+            />
+            <input
+              type="text"
+              value={editProducer}
+              onChange={(e) => setEditProducer(e.target.value)}
+              placeholder="Producer"
+              style={{ ...inputStyle, marginBottom: "8px" }}
+            />
+            <div className="flex gap-2" style={{ marginBottom: "8px" }}>
+              <input
+                type="number"
+                value={editVintage}
+                onChange={(e) => setEditVintage(e.target.value)}
+                placeholder="Vintage"
+                style={{ ...inputStyle, flex: 1 }}
+              />
+              <input
+                type="text"
+                value={editVarietal}
+                onChange={(e) => setEditVarietal(e.target.value)}
+                placeholder="Varietal"
+                style={{ ...inputStyle, flex: 1 }}
+              />
+            </div>
+            <div className="flex gap-2" style={{ marginBottom: "12px" }}>
+              <input
+                type="text"
+                value={editRegion}
+                onChange={(e) => setEditRegion(e.target.value)}
+                placeholder="Region"
+                style={{ ...inputStyle, flex: 1 }}
+              />
+              <input
+                type="number"
+                value={editPricePaid}
+                onChange={(e) => setEditPricePaid(e.target.value)}
+                placeholder="Price paid"
+                style={{ ...inputStyle, flex: 1 }}
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setEditing(false)}
+                className="flex-1 cursor-pointer"
+                style={{
+                  padding: "10px",
+                  background: "transparent",
+                  border: "1px solid #DDD5CA",
+                  borderRadius: "14px",
+                  color: "#6B5E52",
+                  fontSize: "13px",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSaveEdit}
+                className="flex-1 font-semibold cursor-pointer"
+                style={{
+                  padding: "10px",
+                  background: "#722F37",
+                  border: "none",
+                  borderRadius: "14px",
+                  color: "#FFFFFF",
+                  fontSize: "13px",
+                }}
+              >
+                Save Changes
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            <h1
+              className="font-serif font-bold leading-tight"
+              style={{ fontSize: "28px", color: "#2D241B", marginBottom: "4px" }}
+            >
+              {wine.vintage} {wine.name}
+            </h1>
+            <div style={{ fontSize: "15px", color: "#8C7E72", marginBottom: "14px" }}>
+              {wine.producer} · {wine.appellation || wine.region}
+            </div>
+          </>
+        )}
 
         {/* Badges */}
         <div className="flex gap-2 flex-wrap" style={{ marginBottom: "20px" }}>
           {wine.status === "coravined" && <CoravinBadge wine={wine} />}
+          {wine.status === "consumed" && (
+            <div
+              className="inline-flex items-center rounded-full"
+              style={{
+                padding: "5px 12px",
+                fontSize: "12px",
+                background: "rgba(140,126,114,0.12)",
+                border: "1px solid rgba(140,126,114,0.3)",
+                color: "#8C7E72",
+              }}
+            >
+              Consumed{wine.consumed_date ? ` ${wine.consumed_date}` : ""}
+            </div>
+          )}
           <div
             className="inline-flex items-center gap-1 rounded-full"
             style={{
@@ -122,20 +342,76 @@ export default function WineDetail({
               </span>
             )}
           </div>
-          {wine.fridge_id && (
-            <div
-              className="rounded-full"
-              style={{
-                fontSize: "12px",
-                color: "#8C7E72",
-                border: "1px solid #DDD5CA",
-                padding: "5px 12px",
-              }}
-            >
-              📍 {fridges.find((f) => f.id === wine.fridge_id)?.name ?? "Unknown"}
-            </div>
-          )}
+          {/* Fridge badge — tappable to change */}
+          <button
+            onClick={() => setShowFridgePicker(!showFridgePicker)}
+            className="rounded-full cursor-pointer"
+            style={{
+              fontSize: "12px",
+              color: "#8C7E72",
+              border: "1px solid #DDD5CA",
+              padding: "5px 12px",
+              background: "transparent",
+            }}
+          >
+            📍 {wine.fridge_id
+              ? (fridges.find((f) => f.id === wine.fridge_id)?.name ?? "Unknown")
+              : "No fridge"}
+            {" ▾"}
+          </button>
         </div>
+
+        {/* Fridge picker dropdown */}
+        {showFridgePicker && (
+          <div
+            style={{
+              marginBottom: "16px",
+              padding: "12px",
+              background: "#FFFFFF",
+              border: "1px solid #DDD5CA",
+              borderRadius: "14px",
+            }}
+          >
+            <div style={{ fontSize: "12px", color: "#8C7E72", marginBottom: "8px" }}>
+              Move to fridge:
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              {fridges.map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => handleFridgeSelect(f.id)}
+                  className="cursor-pointer"
+                  style={{
+                    padding: "8px 14px",
+                    borderRadius: "14px",
+                    fontSize: "12px",
+                    fontWeight: 500,
+                    background:
+                      wine.fridge_id === f.id ? "rgba(114,47,55,0.15)" : "transparent",
+                    border: `1px solid ${wine.fridge_id === f.id ? "#722F37" : "#DDD5CA"}`,
+                    color: wine.fridge_id === f.id ? "#722F37" : "#8C7E72",
+                  }}
+                >
+                  {f.name}
+                </button>
+              ))}
+              <button
+                onClick={() => handleFridgeSelect(null)}
+                className="cursor-pointer"
+                style={{
+                  padding: "8px 14px",
+                  borderRadius: "14px",
+                  fontSize: "12px",
+                  background: !wine.fridge_id ? "rgba(114,47,55,0.15)" : "transparent",
+                  border: `1px solid ${!wine.fridge_id ? "#722F37" : "#DDD5CA"}`,
+                  color: !wine.fridge_id ? "#722F37" : "#8C7E72",
+                }}
+              >
+                None
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Quick stats */}
         <div className="grid grid-cols-3 gap-3" style={{ marginBottom: "24px" }}>
@@ -200,7 +476,7 @@ export default function WineDetail({
           ))}
         </div>
 
-        {/* Tab content */}
+        {/* Tab content — Overview */}
         {tab === "overview" && (
           <div>
             {wine.blend && (
@@ -248,6 +524,7 @@ export default function WineDetail({
           </div>
         )}
 
+        {/* Tab content — Dossier */}
         {tab === "dossier" && (
           <div>
             {loadingDossier ? (
@@ -338,6 +615,7 @@ export default function WineDetail({
           </div>
         )}
 
+        {/* Tab content — Notes */}
         {tab === "notes" && (
           <div>
             {tastingNotes.length > 0 ? (
@@ -353,7 +631,6 @@ export default function WineDetail({
                       boxShadow: "0 2px 12px rgba(45,36,27,0.06)",
                     }}
                   >
-                    {/* Rating */}
                     {note.rating && (
                       <div style={{ marginBottom: "10px" }}>
                         <div className="flex gap-1">
@@ -371,8 +648,6 @@ export default function WineDetail({
                         </div>
                       </div>
                     )}
-
-                    {/* Tags */}
                     {note.tags && note.tags.length > 0 && (
                       <div className="flex flex-wrap gap-1.5" style={{ marginBottom: "10px" }}>
                         {note.tags.map((tag) => (
@@ -392,8 +667,6 @@ export default function WineDetail({
                         ))}
                       </div>
                     )}
-
-                    {/* Buy again */}
                     {note.buy_again && (
                       <div style={{ marginBottom: "8px" }}>
                         <span
@@ -424,8 +697,6 @@ export default function WineDetail({
                         </span>
                       </div>
                     )}
-
-                    {/* Free text notes */}
                     {note.notes && (
                       <p
                         className="leading-relaxed"
@@ -434,10 +705,9 @@ export default function WineDetail({
                         {note.notes}
                       </p>
                     )}
-
-                    {/* Date */}
                     <div style={{ fontSize: "11px", color: "#8C7E72", marginTop: "10px" }}>
-                      Tasted {new Date(note.tasted_date).toLocaleDateString("en-US", {
+                      Tasted{" "}
+                      {new Date(note.tasted_date).toLocaleDateString("en-US", {
                         month: "short",
                         day: "numeric",
                         year: "numeric",
@@ -458,52 +728,154 @@ export default function WineDetail({
         )}
       </div>
 
-      {/* Action buttons */}
-      {wine.status !== "consumed" && (
-        <div
-          className="fixed z-[101] flex gap-3"
-          style={{
-            bottom: 0,
-            left: "50%",
-            transform: "translateX(-50%)",
-            width: "100%",
-            maxWidth: "430px",
-            padding: "16px 20px 20px",
-            background:
-              "linear-gradient(to top, #FAF7F2 70%, rgba(250,247,242,0.8) 85%, transparent 100%)",
-          }}
-        >
+      {/* Action buttons — different for consumed vs active wines */}
+      <div
+        className="fixed z-[101] flex gap-3"
+        style={{
+          bottom: 0,
+          left: "50%",
+          transform: "translateX(-50%)",
+          width: "100%",
+          maxWidth: "430px",
+          padding: "16px 20px 20px",
+          background:
+            "linear-gradient(to top, #FAF7F2 70%, rgba(250,247,242,0.8) 85%, transparent 100%)",
+        }}
+      >
+        {wine.status === "consumed" ? (
           <button
-            onClick={() => onConsume(wine)}
+            onClick={handleRestore}
             className="flex-1 font-semibold cursor-pointer"
             style={{
               padding: "14px",
-              background: "#722F37",
-              border: "none",
+              background: "transparent",
+              border: "1px solid #DDD5CA",
               borderRadius: "14px",
-              color: "#FFFFFF",
+              color: "#6B5E52",
               fontSize: "15px",
-              boxShadow: "0 4px 16px rgba(114,47,55,0.25)",
             }}
           >
-            Drank It
+            Restore to Cellar
           </button>
-          {wine.status !== "coravined" && (
+        ) : (
+          <>
             <button
-              onClick={() => onCoravin(wine)}
+              onClick={() => setConfirmAction("consume")}
               className="flex-1 font-semibold cursor-pointer"
               style={{
                 padding: "14px",
-                background: "transparent",
-                border: "1px solid #DDD5CA",
+                background: "#722F37",
+                border: "none",
                 borderRadius: "14px",
-                color: "#2D241B",
+                color: "#FFFFFF",
                 fontSize: "15px",
+                boxShadow: "0 4px 16px rgba(114,47,55,0.25)",
               }}
             >
-              Coravined
+              Drank It
             </button>
-          )}
+            {wine.status === "coravined" ? (
+              <button
+                onClick={handleRestore}
+                className="flex-1 cursor-pointer"
+                style={{
+                  padding: "14px",
+                  background: "transparent",
+                  border: "1px solid #DDD5CA",
+                  borderRadius: "14px",
+                  color: "#6B5E52",
+                  fontSize: "15px",
+                }}
+              >
+                Un-Coravin
+              </button>
+            ) : (
+              <button
+                onClick={() => setConfirmAction("coravin")}
+                className="flex-1 font-semibold cursor-pointer"
+                style={{
+                  padding: "14px",
+                  background: "transparent",
+                  border: "1px solid #DDD5CA",
+                  borderRadius: "14px",
+                  color: "#2D241B",
+                  fontSize: "15px",
+                }}
+              >
+                Coravined
+              </button>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Confirmation dialog overlay */}
+      {confirmAction && (
+        <div
+          className="fixed inset-0 z-[200] flex items-end justify-center max-w-[430px] mx-auto"
+          style={{
+            background: "rgba(45,36,27,0.5)",
+            backdropFilter: "blur(12px)",
+            WebkitBackdropFilter: "blur(12px)",
+          }}
+        >
+          <div
+            style={{
+              width: "100%",
+              background: "#FAF7F2",
+              borderRadius: "28px 28px 0 0",
+              padding: "28px 24px 36px",
+            }}
+          >
+            <div
+              style={{
+                width: "40px",
+                height: "4px",
+                background: "#DDD5CA",
+                borderRadius: "100px",
+                margin: "0 auto 20px",
+              }}
+            />
+            <h3
+              className="font-serif font-bold"
+              style={{ fontSize: "20px", color: "#2D241B", marginBottom: "8px" }}
+            >
+              {confirmMessages[confirmAction].title}
+            </h3>
+            <p style={{ fontSize: "14px", color: "#6B5E52", marginBottom: "24px", lineHeight: 1.6 }}>
+              {confirmMessages[confirmAction].message}
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmAction(null)}
+                className="flex-1 cursor-pointer"
+                style={{
+                  padding: "14px",
+                  background: "transparent",
+                  border: "1px solid #DDD5CA",
+                  borderRadius: "14px",
+                  color: "#6B5E52",
+                  fontSize: "15px",
+                }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirm}
+                className="flex-1 font-semibold cursor-pointer"
+                style={{
+                  padding: "14px",
+                  background: confirmMessages[confirmAction].color,
+                  border: "none",
+                  borderRadius: "14px",
+                  color: "#FFFFFF",
+                  fontSize: "15px",
+                }}
+              >
+                {confirmMessages[confirmAction].button}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

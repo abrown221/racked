@@ -202,7 +202,7 @@ export default function TastingFlow({
               fontSize: "15px",
             }}
           >
-            Skip
+            Cancel
           </button>
           <button
             onClick={() => onSave({ rating, tags, buyAgain, notes })}
@@ -218,7 +218,7 @@ export default function TastingFlow({
               boxShadow: "0 4px 16px rgba(114,47,55,0.25)",
             }}
           >
-            Save
+            Save &amp; Mark Consumed
           </button>
         </div>
       </div>
