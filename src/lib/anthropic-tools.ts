@@ -181,10 +181,105 @@ export const extractBookTool = {
   },
 };
 
+export const scanCollectionTool = {
+  name: "scan_collection",
+  description:
+    "Identify ALL visible wine bottles in a photo of a wine rack, fridge shelf, case, or collection. " +
+    "This is for photos showing multiple bottles together (3 or more). " +
+    "IMPORTANT: Use web search to verify each wine exists — labels at a distance are hard to read. " +
+    "For each bottle you can identify, provide the wine details and your confidence level. " +
+    "Mark confidence 'high' if label is clearly readable, 'medium' if fairly sure but label is at an angle, " +
+    "'low' if guessing from partial information. " +
+    "Report the total number of bottles visible (including unidentifiable ones) and the number you could identify.",
+  strict: true,
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      total_bottles_visible: {
+        type: "integer",
+        description: "Total bottles visible in the image, including unidentifiable ones",
+      },
+      total_identified: {
+        type: "integer",
+        description: "Number of bottles you could identify with at least a name",
+      },
+      wines: {
+        type: "array",
+        items: {
+          type: "object",
+          properties: {
+            confidence: {
+              type: "string",
+              enum: ["high", "medium", "low"],
+              description: "Confidence in the identification",
+            },
+            name: { type: "string", description: "Full wine name" },
+            producer: { type: "string", description: "Producer/winery name" },
+            vintage: {
+              type: ["integer", "null"] as const,
+              description: "Vintage year, null if NV or not visible",
+            },
+            region: { type: "string", description: "Wine region" },
+            appellation: {
+              type: ["string", "null"] as const,
+              description: "Specific appellation",
+            },
+            varietal: { type: "string", description: "Primary grape variety" },
+            blend: {
+              type: ["string", "null"] as const,
+              description: "Blend breakdown if known",
+            },
+            alcohol: {
+              type: ["string", "null"] as const,
+              description: "ABV if visible",
+            },
+            estimatedPrice: {
+              type: ["number", "null"] as const,
+              description: "Estimated retail price USD",
+            },
+            drinkingWindowStart: {
+              type: ["integer", "null"] as const,
+              description: "Drinking window start year",
+            },
+            drinkingWindowEnd: {
+              type: ["integer", "null"] as const,
+              description: "Drinking window end year",
+            },
+            fridgeSuggestion: {
+              type: "string",
+              enum: ["daily", "cellar"],
+              description: "'daily' for drink-soon, 'cellar' for age-worthy",
+            },
+            fridgeReason: {
+              type: "string",
+              description: "One sentence explaining fridge suggestion",
+            },
+            suggestedTags: {
+              type: "array",
+              items: { type: "string" },
+              description: "5 flavor/character tags",
+            },
+          },
+          required: [
+            "confidence", "name", "producer", "vintage", "region",
+            "appellation", "varietal", "blend", "alcohol",
+            "estimatedPrice", "drinkingWindowStart", "drinkingWindowEnd",
+            "fridgeSuggestion", "fridgeReason", "suggestedTags",
+          ],
+          additionalProperties: false,
+        },
+        description: "Array of identified wines with confidence levels",
+      },
+    },
+    required: ["total_bottles_visible", "total_identified", "wines"],
+    additionalProperties: false,
+  },
+};
+
 // ─── Types ──────────────────────────────────────────────────────────
 
 export type AnalyzePhotoResult = {
-  intent: "identify_wine" | "analyze_shelf" | "extract_book";
+  intent: "identify_wine" | "analyze_shelf" | "extract_book" | "scan_collection";
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data: Record<string, any>;
   usage?: {
@@ -220,7 +315,8 @@ export async function callClaudeWithTools({
     "You are analyzing a photo taken by a wine enthusiast.",
     "",
     "Based on what you see in the image, use the appropriate tool:",
-    "- identify_wine: for photos of wine bottle labels, bottles on a counter, bottles in a fridge, or any image where wine bottles are the primary subject",
+    "- identify_wine: for photos showing 1-2 wine bottles where labels are clearly visible",
+    "- scan_collection: for photos showing 3+ bottles in a rack, fridge, case, or collection",
     "- analyze_shelf: for photos of retail store shelves, wine shop displays, or store aisles with price tags visible",
     "- extract_book: for photos of book pages, magazine articles, wine lists, restaurant menus, or any printed text about wine",
     "",
@@ -229,6 +325,10 @@ export async function callClaudeWithTools({
     "Search for what you think the wine is, confirm the correct spelling of the producer and wine name,",
     "and use the search results to fill in accurate pricing, drinking windows, and regional details.",
     "Never guess a wine name without verifying it exists via search.",
+    "",
+    "For collection scans: identify every bottle you can see, even partially obscured ones.",
+    "Mark confidence 'high' if label is clearly readable, 'medium' if fairly sure but at an angle,",
+    "'low' if guessing from partial information. Always verify names via web search.",
     "",
     "You MUST call exactly one tool. Choose the best match for what you see.",
   ];
@@ -248,11 +348,12 @@ export async function callClaudeWithTools({
 
   const body = {
     model: "claude-sonnet-4-6",
-    max_tokens: 4096,
+    max_tokens: 8192,
     system: systemParts.join("\n"),
     tools: [
-      { type: "web_search_20250305", name: "web_search" },
+      { type: "web_search_20250305", name: "web_search", max_uses: 8 },
       identifyWineTool,
+      scanCollectionTool,
       analyzeShelfTool,
       extractBookTool,
     ],

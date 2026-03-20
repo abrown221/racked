@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
+import { useCellar } from "@/hooks/useCellar";
 
 const tabs = [
   { id: "tonight", icon: "◑", label: "Tonight", path: "/tonight" },
@@ -13,6 +14,7 @@ const tabs = [
 export default function BottomNav() {
   const pathname = usePathname();
   const router = useRouter();
+  const { scanQueueCount } = useCellar();
 
   return (
     <nav
@@ -34,7 +36,7 @@ export default function BottomNav() {
               <button
                 key={tab.id}
                 onClick={() => router.push(tab.path)}
-                className="flex flex-col items-center border-none bg-transparent cursor-pointer -mt-4 px-2"
+                className="flex flex-col items-center border-none bg-transparent cursor-pointer -mt-4 px-2 relative"
               >
                 <div
                   className="flex items-center justify-center"
@@ -51,6 +53,26 @@ export default function BottomNav() {
                 >
                   ◉
                 </div>
+                {scanQueueCount > 0 && (
+                  <div
+                    className="absolute flex items-center justify-center"
+                    style={{
+                      top: -4,
+                      right: 2,
+                      minWidth: "20px",
+                      height: "20px",
+                      borderRadius: "10px",
+                      background: "#722F37",
+                      border: "2px solid #FAF7F2",
+                      color: "#FFFFFF",
+                      fontSize: "10px",
+                      fontWeight: 700,
+                      padding: "0 5px",
+                    }}
+                  >
+                    {scanQueueCount > 99 ? "99+" : scanQueueCount}
+                  </div>
+                )}
               </button>
             );
           }

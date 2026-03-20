@@ -50,6 +50,8 @@ type CellarContextType = {
   getDossier: (wineId: string) => Dossier | undefined;
   saveTastingNote: (wineId: string, data: TastingNoteInput) => Promise<void>;
   loadTastingNotes: (wineId: string) => Promise<void>;
+  scanQueueCount: number;
+  refreshScanQueue: () => Promise<void>;
 };
 
 const CellarContext = createContext<CellarContextType | null>(null);
@@ -63,6 +65,7 @@ export function CellarProvider({ children }: { children: ReactNode }) {
   const [tastingNotes, setTastingNotes] = useState<Record<string, TastingNote[]>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [scanQueueCount, setScanQueueCount] = useState(0);
 
   const supabase = createClient();
 
@@ -196,6 +199,14 @@ export function CellarProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      // Load scan queue count
+      const { count: scanCount } = await supabase
+        .from("scan_results")
+        .select("*", { count: "exact", head: true })
+        .eq("cellar_id", cellarId)
+        .eq("status", "pending_review");
+      setScanQueueCount(scanCount || 0);
+
       setLoading(false);
     }
     load();
@@ -229,6 +240,16 @@ export function CellarProvider({ children }: { children: ReactNode }) {
       .eq("cellar_id", cellar.id)
       .order("created_at", { ascending: false });
     if (data) setWishlist(data);
+  }, [cellar]);
+
+  const refreshScanQueue = useCallback(async () => {
+    if (!cellar) return;
+    const { count } = await supabase
+      .from("scan_results")
+      .select("*", { count: "exact", head: true })
+      .eq("cellar_id", cellar.id)
+      .eq("status", "pending_review");
+    setScanQueueCount(count || 0);
   }, [cellar]);
 
   const addWine = useCallback(
@@ -527,6 +548,8 @@ export function CellarProvider({ children }: { children: ReactNode }) {
         getDossier,
         saveTastingNote,
         loadTastingNotes,
+        scanQueueCount,
+        refreshScanQueue,
       }}
     >
       {children}

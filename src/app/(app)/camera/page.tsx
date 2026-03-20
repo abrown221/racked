@@ -39,7 +39,7 @@ type BookResult = {
 /** Resize image to max dimension, return { base64, dataUrl, mediaType } */
 function resizeImage(
   file: File,
-  maxDim = 1200
+  maxDim = 1568
 ): Promise<{ base64: string; dataUrl: string; mediaType: string }> {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -112,10 +112,11 @@ function ProcessingIndicator() {
 }
 
 export default function CameraPage() {
-  const { wines, fridges, wishlist, addWine, addWishlistItem } = useCellar();
+  const { wines, fridges, wishlist, addWine, addWishlistItem, scanQueueCount, refreshScanQueue } = useCellar();
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
 
+  const [mode, setMode] = useState<"single" | "batch">("single");
   const [state, setState] = useState<"idle" | "processing" | "result">("idle");
   const [intent, setIntent] = useState<string | null>(null);
   const [cameraResult, setCameraResult] = useState<CameraResult | null>(null);
@@ -128,10 +129,90 @@ export default function CameraPage() {
   const [editProducer, setEditProducer] = useState("");
   const [editVintage, setEditVintage] = useState("");
   const [quantity, setQuantity] = useState(1);
+  const [batchQueued, setBatchQueued] = useState(0);
+  const [batchPending, setBatchPending] = useState(0);
+  const [batchReady, setBatchReady] = useState(scanQueueCount);
+  const [batchFlash, setBatchFlash] = useState(false);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const activeWines = wines.filter((w) => w.status !== "consumed");
 
+  // Keep batchReady in sync with scanQueueCount from context
+  useEffect(() => {
+    setBatchReady(scanQueueCount);
+  }, [scanQueueCount]);
+
+  // Polling effect: process queued photos one at a time
+  useEffect(() => {
+    if (batchPending <= 0 && batchQueued <= 0) return;
+
+    const poll = async () => {
+      try {
+        const res = await fetch("/api/wine/process-next-scan", { method: "POST" });
+        if (!res.ok) return;
+        const data = await res.json();
+        setBatchPending(data.pendingCount || 0);
+        if (data.status === "processed" || data.status === "error") {
+          refreshScanQueue();
+        }
+        if (data.status === "idle" && data.pendingCount === 0) {
+          setBatchQueued(0);
+        }
+      } catch (err) {
+        console.error("Poll error:", err);
+      }
+    };
+
+    // Start immediately, then every 15s
+    poll();
+    pollingRef.current = setInterval(poll, 15000);
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, [batchPending, batchQueued, refreshScanQueue]);
+
+  // Batch mode photo handler — upload instantly, no waiting
+  const handleBatchPhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+
+    try {
+      const { base64, mediaType } = await resizeImage(file);
+      setBatchQueued((q) => q + 1);
+
+      // Flash confirmation
+      setBatchFlash(true);
+      setTimeout(() => setBatchFlash(false), 1500);
+
+      const res = await fetch("/api/wine/upload-scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ base64, mediaType }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || "Upload failed");
+      }
+
+      setBatchPending((p) => p + 1);
+    } catch (err) {
+      console.error("Batch upload error:", err);
+      setCameraError(
+        err instanceof Error ? err.message : "Failed to queue photo"
+      );
+      setBatchQueued((q) => Math.max(0, q - 1));
+    }
+  };
+
   const handlePhoto = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Route to batch handler if in batch mode
+    if (mode === "batch") {
+      handleBatchPhoto(e);
+      return;
+    }
+
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -222,6 +303,30 @@ export default function CameraPage() {
           break;
         }
 
+        case "scan_collection": {
+          // Multiple bottles found — show as collection results
+          // Map to ShopResult-like cards for inline review
+          const collectionWines = (data.wines || []).map(
+            (w: {
+              name: string;
+              vintage: number | null;
+              confidence: string;
+              producer: string;
+              varietal: string;
+              estimatedPrice: number | null;
+            }) => ({
+              name: `${w.producer} ${w.name}`,
+              vintage: w.vintage,
+              price: w.estimatedPrice ? `~$${w.estimatedPrice}` : null,
+              recommendation: w.confidence === "low" ? "skip" : "buy",
+              reason: `${w.varietal} · Confidence: ${w.confidence}`,
+            })
+          );
+          setShopResults(collectionWines);
+          setState("result");
+          break;
+        }
+
         default:
           throw new Error(`Unknown analysis type: ${detectedIntent}`);
       }
@@ -295,9 +400,103 @@ export default function CameraPage() {
       >
         Camera
       </h1>
-      <div style={{ fontSize: "13px", color: "#8C7E72", marginBottom: "32px" }}>
+      <div style={{ fontSize: "13px", color: "#8C7E72", marginBottom: "16px" }}>
         Point at anything wine-related
       </div>
+
+      {/* Mode toggle */}
+      <div className="flex gap-1" style={{
+        background: "#F0EBE3",
+        borderRadius: "100px",
+        padding: "3px",
+        marginBottom: "16px",
+      }}>
+        {(["single", "batch"] as const).map((m) => (
+          <button
+            key={m}
+            onClick={() => setMode(m)}
+            className="flex-1 cursor-pointer capitalize"
+            style={{
+              padding: "8px 16px",
+              borderRadius: "100px",
+              fontSize: "13px",
+              fontWeight: 500,
+              border: "none",
+              background: mode === m ? "#FFFFFF" : "transparent",
+              color: mode === m ? "#2D241B" : "#8C7E72",
+              boxShadow: mode === m ? "0 1px 4px rgba(45,36,27,0.1)" : "none",
+              transition: "all 0.2s",
+            }}
+          >
+            {m === "batch" && scanQueueCount > 0 ? `Batch (${scanQueueCount})` : m}
+          </button>
+        ))}
+      </div>
+
+      {/* Batch status bar */}
+      {mode === "batch" && (batchPending > 0 || batchQueued > 0) && (
+        <div style={{
+          padding: "10px 14px",
+          background: "rgba(114,47,55,0.06)",
+          border: "1px solid rgba(114,47,55,0.12)",
+          borderRadius: "14px",
+          marginBottom: "16px",
+          fontSize: "12px",
+          color: "#6B5E52",
+        }}>
+          Processing: {batchQueued > 0 && `${batchQueued} queued`}
+          {batchQueued > 0 && batchPending > 0 && " · "}
+          {batchPending > 0 && `${batchPending} pending`}
+        </div>
+      )}
+
+      {/* Review Queue button */}
+      {scanQueueCount > 0 && (
+        <button
+          onClick={() => router.push("/camera/review")}
+          className="w-full cursor-pointer"
+          style={{
+            padding: "14px 20px",
+            background: "#722F37",
+            border: "none",
+            borderRadius: "14px",
+            color: "#FFFFFF",
+            fontSize: "15px",
+            fontWeight: 600,
+            marginBottom: "16px",
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            boxShadow: "0 4px 16px rgba(114,47,55,0.25)",
+          }}
+        >
+          <span>Review Queue</span>
+          <span style={{
+            background: "rgba(255,255,255,0.25)",
+            padding: "2px 10px",
+            borderRadius: "100px",
+            fontSize: "13px",
+          }}>
+            {scanQueueCount}
+          </span>
+        </button>
+      )}
+
+      {/* Batch flash confirmation */}
+      {batchFlash && (
+        <div className="text-center" style={{
+          padding: "12px",
+          background: "rgba(90,122,74,0.1)",
+          border: "1px solid rgba(90,122,74,0.25)",
+          borderRadius: "14px",
+          marginBottom: "16px",
+          fontSize: "14px",
+          color: "#5A7A4A",
+          fontWeight: 500,
+        }}>
+          Photo queued!
+        </div>
+      )}
 
       <input
         ref={fileRef}
@@ -366,7 +565,7 @@ export default function CameraPage() {
           >
             Wine label · Retail shelf · Book page
             <br />
-            Receipt · Wine list · Your fridge
+            {mode === "batch" ? "Snap multiple photos — review later" : "Receipt · Wine list · Your fridge"}
           </div>
         </div>
       )}
