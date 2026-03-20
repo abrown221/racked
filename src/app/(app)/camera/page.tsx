@@ -95,39 +95,49 @@ export default function CameraPage() {
       // Resize image to prevent oversized payloads
       const { base64, dataUrl, mediaType } = await resizeImage(file);
 
-      // Detect intent
-      const intentRes = await fetch("/api/wine/detect-intent", {
+      // Build context for shelf cross-referencing
+      const cellarNames = wines
+        .map((w) => `${w.vintage} ${w.producer} ${w.name}`)
+        .join(", ");
+      const wishNames = wishlist.map((w) => w.name).join(", ");
+
+      // SINGLE API call — intent detection + analysis in one round trip
+      const res = await fetch("/api/wine/analyze-photo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ base64, mediaType }),
+        body: JSON.stringify({ base64, mediaType, cellarNames, wishNames }),
       });
-      if (!intentRes.ok) {
-        const err = await intentRes.json().catch(() => ({}));
-        throw new Error(err.error || `Intent detection failed (${intentRes.status})`);
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.error || `Analysis failed (${res.status})`);
       }
-      const { intent: detectedIntent } = await intentRes.json();
+
+      const { intent: detectedIntent, data } = await res.json();
       setIntent(detectedIntent);
 
-      if (
-        detectedIntent === "label" ||
-        detectedIntent === "bottles" ||
-        detectedIntent === "fridge" ||
-        detectedIntent === "other" ||
-        !detectedIntent
-      ) {
-        // Label identification (also fallback for unknown/missing intent)
-        const identRes = await fetch("/api/wine/identify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ base64, mediaType }),
-        });
-        if (!identRes.ok) {
-          const err = await identRes.json().catch(() => ({}));
-          throw new Error(err.error || `Wine identification failed (${identRes.status})`);
-        }
-        const result = await identRes.json();
-        if (result && !result.error) {
-          result.photoDataUrl = dataUrl;
+      switch (detectedIntent) {
+        case "identify_wine": {
+          const result: CameraResult = {
+            name: data.name,
+            producer: data.producer,
+            vintage: data.vintage,
+            region: data.region,
+            appellation: data.appellation,
+            varietal: data.varietal,
+            blend: data.blend,
+            alcohol: data.alcohol,
+            estimatedPrice: data.estimatedPrice,
+            drinkingWindow: {
+              start: data.drinkingWindowStart,
+              end: data.drinkingWindowEnd,
+            },
+            fridgeSuggestion: data.fridgeSuggestion,
+            fridgeReason: data.fridgeReason,
+            suggestedTags: data.suggestedTags,
+            photoDataUrl: dataUrl,
+          };
+
           // Auto-suggest fridge
           const dailyF = fridges.find((f) => f.type === "daily");
           const cellarF = fridges.find((f) => f.type === "cellar");
@@ -138,63 +148,23 @@ export default function CameraPage() {
           );
           setCameraResult(result);
           setState("result");
-        } else {
-          throw new Error(result?.error || "Could not identify wine from this photo. Try a clearer shot of the label.");
+          break;
         }
-      } else if (detectedIntent === "shelf") {
-        const cellarNames = wines
-          .map((w) => `${w.vintage} ${w.producer} ${w.name}`)
-          .join(", ");
-        const wishNames = wishlist.map((w) => w.name).join(", ");
-        const shelfRes = await fetch("/api/wine/analyze-shelf", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            base64,
-            mediaType,
-            cellarNames,
-            wishNames,
-          }),
-        });
-        if (!shelfRes.ok) {
-          const err = await shelfRes.json().catch(() => ({}));
-          throw new Error(err.error || `Shelf analysis failed (${shelfRes.status})`);
-        }
-        const results = await shelfRes.json();
-        setShopResults(Array.isArray(results) ? results : []);
-        setState("result");
-      } else if (detectedIntent === "book" || detectedIntent === "winelist") {
-        const bookRes = await fetch("/api/wine/extract-book", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ base64, mediaType }),
-        });
-        if (!bookRes.ok) {
-          const err = await bookRes.json().catch(() => ({}));
-          throw new Error(err.error || `Book extraction failed (${bookRes.status})`);
-        }
-        const results = await bookRes.json();
-        setBookResults(Array.isArray(results) ? results : []);
-        setState("result");
-      } else {
-        // Unknown intent — fallback to label identification
-        const identRes = await fetch("/api/wine/identify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ base64, mediaType }),
-        });
-        if (!identRes.ok) {
-          const err = await identRes.json().catch(() => ({}));
-          throw new Error(err.error || `Wine identification failed (${identRes.status})`);
-        }
-        const result = await identRes.json();
-        if (result && !result.error) {
-          result.photoDataUrl = dataUrl;
-          setCameraResult(result);
+
+        case "analyze_shelf": {
+          setShopResults(data.wines || []);
           setState("result");
-        } else {
-          throw new Error(result?.error || "Could not identify wine from this photo.");
+          break;
         }
+
+        case "extract_book": {
+          setBookResults(data.wines || []);
+          setState("result");
+          break;
+        }
+
+        default:
+          throw new Error(`Unknown analysis type: ${detectedIntent}`);
       }
     } catch (err) {
       console.error("Camera error:", err);

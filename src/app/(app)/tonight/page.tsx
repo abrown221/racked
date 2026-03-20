@@ -56,7 +56,9 @@ export default function TonightPage() {
       });
       const data = await res.json();
       if (Array.isArray(data)) setRecommendations(data);
-    } catch {}
+    } catch (err) {
+      console.error("Recommendations error:", err);
+    }
     setLoadingRecs(false);
   };
 
@@ -80,7 +82,10 @@ export default function TonightPage() {
       });
       const data = await res.json();
       setAskResponse(data.response || "");
-    } catch {}
+    } catch (err) {
+      console.error("Ask sommelier error:", err);
+      setAskResponse("Sorry, I couldn't process that. Please try again.");
+    }
     setAskLoading(false);
     setAskInput("");
   };
@@ -128,7 +133,9 @@ export default function TonightPage() {
       if (data && !data.error) {
         await saveDossier(wine.id, data);
       }
-    } catch {}
+    } catch (err) {
+      console.error("Research error:", err);
+    }
     setResearchingWineId(null);
   };
 
