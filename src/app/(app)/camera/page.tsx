@@ -115,6 +115,7 @@ export default function CameraPage() {
   const { wines, fridges, wishlist, addWine, addWishlistItem, scanQueueCount, refreshScanQueue } = useCellar();
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
+  const shopModeRef = useRef(false);
 
   const [mode, setMode] = useState<"single" | "batch">("single");
   const [state, setState] = useState<"idle" | "processing" | "result">("idle");
@@ -238,10 +239,13 @@ export default function CameraPage() {
       const wishNames = wishlist.map((w) => w.name).join(", ");
 
       // SINGLE API call — intent detection + analysis in one round trip
+      const forceIntent = shopModeRef.current ? "analyze_shelf" : undefined;
+      shopModeRef.current = false;
+
       const res = await fetch("/api/wine/analyze-photo", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ base64, mediaType, cellarNames, wishNames }),
+        body: JSON.stringify({ base64, mediaType, cellarNames, wishNames, forceIntent }),
       });
 
       if (!res.ok) {
@@ -563,9 +567,34 @@ export default function CameraPage() {
               lineHeight: 1.8,
             }}
           >
-            Wine label · Retail shelf · Book page
+            Wine label · Book page · Your fridge
             <br />
-            {mode === "batch" ? "Snap multiple photos — review later" : "Receipt · Wine list · Your fridge"}
+            {mode === "batch" ? "Snap multiple photos — review later" : "Tap to scan and identify"}
+          </div>
+
+          {/* Shop Mode button */}
+          <button
+            onClick={() => {
+              shopModeRef.current = true;
+              fileRef.current?.click();
+            }}
+            className="cursor-pointer"
+            style={{
+              marginTop: "20px",
+              padding: "12px 28px",
+              background: "transparent",
+              border: "1px solid #DDD5CA",
+              borderRadius: "100px",
+              color: "#6B5E52",
+              fontSize: "14px",
+              fontWeight: 500,
+              transition: "all 0.2s",
+            }}
+          >
+            🛒 Shop Mode
+          </button>
+          <div style={{ fontSize: "11px", color: "#8C7E72", marginTop: "6px" }}>
+            Photograph a store shelf for buy/skip advice
           </div>
         </div>
       )}

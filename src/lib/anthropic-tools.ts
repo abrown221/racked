@@ -299,11 +299,13 @@ export async function callClaudeWithTools({
   mediaType,
   cellarNames,
   wishNames,
+  forceIntent,
 }: {
   base64: string;
   mediaType: string;
   cellarNames?: string;
   wishNames?: string;
+  forceIntent?: string;
 }): Promise<AnalyzePhotoResult> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -375,7 +377,9 @@ export async function callClaudeWithTools({
       analyzeShelfTool,
       extractBookTool,
     ],
-    tool_choice: { type: "any" as const, disable_parallel_tool_use: true },
+    tool_choice: forceIntent
+      ? { type: "tool" as const, name: forceIntent, disable_parallel_tool_use: true }
+      : { type: "any" as const, disable_parallel_tool_use: true },
     messages: [
       {
         role: "user" as const,

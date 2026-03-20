@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
 
     // Parse request body
     const body = await req.json();
-    const { base64, mediaType, cellarNames, wishNames } = body;
+    const { base64, mediaType, cellarNames, wishNames, forceIntent } = body;
 
     if (!base64 || !mediaType) {
       return NextResponse.json(
@@ -32,6 +32,7 @@ export async function POST(req: NextRequest) {
       mediaType,
       hasCellarContext: !!cellarNames,
       hasWishlistContext: !!wishNames,
+      forceIntent: forceIntent || "auto",
     });
 
     // Single Claude API call with strict tools — intent detection + analysis in one round trip
@@ -40,6 +41,7 @@ export async function POST(req: NextRequest) {
       mediaType,
       cellarNames: cellarNames || undefined,
       wishNames: wishNames || undefined,
+      forceIntent: forceIntent || undefined,
     });
 
     return NextResponse.json({
