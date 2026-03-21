@@ -134,6 +134,7 @@ export default function CameraPage() {
   const [batchPending, setBatchPending] = useState(0);
   const [batchReady, setBatchReady] = useState(scanQueueCount);
   const [batchFlash, setBatchFlash] = useState(false);
+  const [duplicateWine, setDuplicateWine] = useState<{ name: string; count: number } | null>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const activeWines = wines.filter((w) => w.status !== "consumed");
@@ -227,6 +228,7 @@ export default function CameraPage() {
     setEditProducer("");
     setEditVintage("");
     setQuantity(1);
+    setDuplicateWine(null);
 
     try {
       // Resize image to prevent oversized payloads
@@ -291,6 +293,29 @@ export default function CameraPage() {
           setEditProducer(result.producer);
           setEditVintage(result.vintage ? String(result.vintage) : "");
           setQuantity(1);
+
+          // Duplicate detection against cellar
+          const normalize = (s: string) =>
+            s.toLowerCase().trim()
+              .replace(/château|chateau/gi, "chateau")
+              .replace(/domaine/gi, "domaine")
+              .replace(/['']/g, "'");
+          const matchingWines = activeWines.filter((w) => {
+            const nameMatch = normalize(result.name) === normalize(w.name);
+            const producerMatch =
+              !result.producer || !w.producer ||
+              normalize(result.producer) === normalize(w.producer);
+            return nameMatch && producerMatch;
+          });
+          if (matchingWines.length > 0) {
+            setDuplicateWine({
+              name: matchingWines[0].name,
+              count: matchingWines.length,
+            });
+          } else {
+            setDuplicateWine(null);
+          }
+
           setState("result");
           break;
         }
@@ -646,6 +671,23 @@ export default function CameraPage() {
               >
                 Identified
               </div>
+
+              {/* Duplicate warning */}
+              {duplicateWine && (
+                <div
+                  style={{
+                    padding: "10px 14px",
+                    background: "rgba(160,134,78,0.1)",
+                    border: "1px solid rgba(160,134,78,0.25)",
+                    borderRadius: "12px",
+                    marginBottom: "12px",
+                    fontSize: "13px",
+                    color: "#A07830",
+                  }}
+                >
+                  Already in cellar{duplicateWine.count > 1 ? ` (×${duplicateWine.count})` : ""} — {duplicateWine.name}
+                </div>
+              )}
 
               {/* Editable wine name */}
               <input
