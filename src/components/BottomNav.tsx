@@ -20,10 +20,9 @@ export default function BottomNav() {
     <nav
       className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[430px] z-50"
       style={{
-        background: "rgba(250,247,242,0.92)",
-        backdropFilter: "blur(24px)",
-        WebkitBackdropFilter: "blur(24px)",
-        borderTop: "1px solid rgba(221,213,202,0.6)",
+        background: "#FAF7F2",
+        borderTop: "none",
+        boxShadow: "0 -4px 16px rgba(166,157,145,0.25)",
       }}
     >
       <div className="flex items-end justify-around px-1" style={{ paddingBottom: "max(env(safe-area-inset-bottom), 10px)", paddingTop: 6 }}>

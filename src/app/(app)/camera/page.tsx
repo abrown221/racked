@@ -19,6 +19,7 @@ type CameraResult = {
   fridgeReason: string;
   suggestedTags: string[];
   photoDataUrl?: string;
+  bottleImageUrl?: string;
 };
 
 type ShopResult = {
@@ -278,6 +279,7 @@ export default function CameraPage() {
             fridgeReason: data.fridgeReason,
             suggestedTags: data.suggestedTags,
             photoDataUrl: dataUrl,
+            bottleImageUrl: data.bottleImageUrl || undefined,
           };
 
           // Auto-suggest fridge
@@ -411,6 +413,7 @@ export default function CameraPage() {
       fridge_id: selectedFridge,
       price_paid: pricePaid ? parseFloat(pricePaid) : null,
       status: "sealed" as const,
+      photo_url: cameraResult.bottleImageUrl || null,
     };
 
     // Add N bottles (each gets its own DB row for independent tracking)
@@ -443,26 +446,24 @@ export default function CameraPage() {
       </div>
 
       {/* Mode toggle */}
-      <div className="flex gap-1" style={{
-        background: "#F0EBE3",
+      <div className="flex gap-1 nm-inset" style={{
         borderRadius: "100px",
-        padding: "3px",
+        padding: "4px",
         marginBottom: "16px",
       }}>
         {(["single", "batch"] as const).map((m) => (
           <button
             key={m}
             onClick={() => setMode(m)}
-            className="flex-1 cursor-pointer capitalize"
+            className={`flex-1 cursor-pointer capitalize ${mode === m ? "nm-raised-sm" : ""}`}
             style={{
               padding: "8px 16px",
               borderRadius: "100px",
               fontSize: "13px",
               fontWeight: 500,
               border: "none",
-              background: mode === m ? "#FFFFFF" : "transparent",
+              background: mode === m ? "#FAF7F2" : "transparent",
               color: mode === m ? "#2D241B" : "#8C7E72",
-              boxShadow: mode === m ? "0 1px 4px rgba(45,36,27,0.1)" : "none",
               transition: "all 0.2s",
             }}
           >

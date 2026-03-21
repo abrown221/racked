@@ -5,9 +5,9 @@
   --font-serif: "Cormorant Garamond", serif;
   --font-sans: "Libre Franklin", sans-serif;
 
-  /* Palette: The Cellar */
+  /* Palette: The Cellar — warm cream base */
   --color-bg: #FAF7F2;
-  --color-card: #FFFFFF;
+  --color-card: #FAF7F2;
   --color-surface: #F0EBE3;
   --color-border: #DDD5CA;
 
@@ -51,6 +51,54 @@ textarea {
   display: none;
 }
 
+/* ═══ Neumorphic shadow system ═══ */
+
+.nm-raised {
+  background: #FAF7F2;
+  box-shadow:
+    6px 6px 14px rgba(180, 170, 158, 0.4),
+    -6px -6px 14px rgba(255, 255, 255, 0.8);
+  border: none;
+}
+
+.nm-raised-sm {
+  background: #FAF7F2;
+  box-shadow:
+    3px 3px 8px rgba(180, 170, 158, 0.3),
+    -3px -3px 8px rgba(255, 255, 255, 0.7);
+  border: none;
+}
+
+.nm-raised-accent {
+  background: linear-gradient(135deg, #722F37, #8E3A48);
+  box-shadow:
+    5px 5px 12px rgba(90, 30, 40, 0.45),
+    -3px -3px 10px rgba(166, 73, 85, 0.3);
+  border: none;
+}
+
+.nm-inset {
+  box-shadow:
+    inset 3px 3px 7px rgba(180, 170, 158, 0.35),
+    inset -3px -3px 7px rgba(255, 255, 255, 0.65);
+  border: none;
+  background: #F0EBE3;
+}
+
+.nm-flat {
+  background: #FAF7F2;
+  box-shadow: none;
+  border: none;
+}
+
+.nm-pressed {
+  box-shadow:
+    inset 2px 2px 5px rgba(180, 170, 158, 0.45),
+    inset -2px -2px 5px rgba(255, 255, 255, 0.55);
+}
+
+/* ═══ Animations ═══ */
+
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -72,10 +120,27 @@ textarea {
   }
 }
 
+@keyframes nmPulse {
+  0%, 100% {
+    box-shadow:
+      6px 6px 14px rgba(166, 157, 145, 0.45),
+      -6px -6px 14px rgba(255, 255, 255, 0.75);
+  }
+  50% {
+    box-shadow:
+      4px 4px 10px rgba(166, 157, 145, 0.3),
+      -4px -4px 10px rgba(255, 255, 255, 0.6);
+  }
+}
+
 .fade-in {
   animation: fadeIn 0.4s ease both;
 }
 
 .animate-pulse-slow {
   animation: pulse 1.5s infinite;
+}
+
+.nm-pulse {
+  animation: nmPulse 2s ease-in-out infinite;
 }

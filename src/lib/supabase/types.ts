@@ -130,5 +130,6 @@ export type ScanResult = {
   fridge_reason: string | null;
   suggested_tags: string[] | null;
   duplicate_of: string | null;
+  bottle_image_url: string | null;
   created_at: string;
 };

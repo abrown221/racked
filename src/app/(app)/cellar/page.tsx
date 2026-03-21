@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useCellar } from "@/hooks/useCellar";
 import WineDetail from "@/components/WineDetail";
@@ -42,6 +42,7 @@ export default function CellarPage() {
     getDossier,
     saveTastingNote,
     loadTastingNotes,
+    refreshWines,
   } = useCellar();
   const router = useRouter();
   const [selectedWine, setSelectedWine] = useState<Wine | null>(null);
@@ -49,6 +50,9 @@ export default function CellarPage() {
   const [filter, setFilter] = useState("active");
   const [sortMode, setSortMode] = useState<"region" | "urgency">("region");
   const [researchingWineId, setResearchingWineId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [enriching, setEnriching] = useState(false);
+  const [enrichProgress, setEnrichProgress] = useState({ done: 0, total: 0, current: "" });
 
   const activeWines = wines.filter((w) => w.status !== "consumed");
 
@@ -62,6 +66,81 @@ export default function CellarPage() {
           : wines.filter(
               (w) => w.fridge_id === filter && w.status !== "consumed"
             );
+
+  // Apply search filter
+  const searchedWines = useMemo(() => {
+    if (!searchQuery.trim()) return filteredWines;
+    const q = searchQuery.toLowerCase();
+    return filteredWines.filter(
+      (w) =>
+        w.name?.toLowerCase().includes(q) ||
+        w.producer?.toLowerCase().includes(q) ||
+        w.varietal?.toLowerCase().includes(q) ||
+        w.region?.toLowerCase().includes(q) ||
+        (w.vintage && String(w.vintage).includes(q))
+    );
+  }, [filteredWines, searchQuery]);
+
+  // Enrich all wines missing photos or dossiers
+  const handleEnrichAll = useCallback(async () => {
+    const seen = new Set<string>();
+    const needsEnrich: Wine[] = [];
+    for (const wine of activeWines) {
+      const key = `${(wine.name || "").toLowerCase()}|${(wine.producer || "").toLowerCase()}|${wine.vintage || "NV"}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const hasDossier = !!getDossier(wine.id);
+      if (!wine.photo_url || !hasDossier) {
+        needsEnrich.push(wine);
+      }
+    }
+
+    if (needsEnrich.length === 0) return;
+
+    setEnriching(true);
+    setEnrichProgress({ done: 0, total: needsEnrich.length, current: "" });
+    let errors = 0;
+
+    for (let i = 0; i < needsEnrich.length; i++) {
+      const wine = needsEnrich[i];
+      const label = `${wine.vintage || "NV"} ${wine.producer || ""} ${wine.name}`.trim();
+      setEnrichProgress({
+        done: i,
+        total: needsEnrich.length,
+        current: errors > 0 ? `${label} (${errors} failed)` : label,
+      });
+
+      try {
+        const res = await fetch("/api/wine/enrich", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ wineId: wine.id }),
+        });
+
+        if (!res.ok) {
+          errors++;
+          const err = await res.json().catch(() => ({}));
+          console.error("Enrich failed for", label, err.error || res.status);
+        }
+      } catch (err) {
+        errors++;
+        console.error("Enrich failed for", label, err);
+      }
+
+      // Refresh UI every 5 wines so user sees progress
+      if ((i + 1) % 5 === 0) {
+        await refreshWines();
+      }
+    }
+
+    setEnrichProgress({
+      done: needsEnrich.length,
+      total: needsEnrich.length,
+      current: errors > 0 ? `Done — ${errors} failed` : "Done!",
+    });
+    await refreshWines();
+    setTimeout(() => setEnriching(false), 2000);
+  }, [activeWines, getDossier, refreshWines]);
 
   const filters = [
     { id: "active", label: `Active (${activeWines.length})` },
@@ -79,7 +158,7 @@ export default function CellarPage() {
   // Group wines by name+producer+vintage
   const wineGroups = useMemo(() => {
     const groupMap = new Map<string, Wine[]>();
-    for (const wine of filteredWines) {
+    for (const wine of searchedWines) {
       const key = `${(wine.name || "").toLowerCase()}|${(wine.producer || "").toLowerCase()}|${wine.vintage || "NV"}`;
       const existing = groupMap.get(key) || [];
       existing.push(wine);
@@ -97,7 +176,7 @@ export default function CellarPage() {
       });
     }
     return groups;
-  }, [filteredWines]);
+  }, [searchedWines]);
 
   // Sort and organize by mode
   const organizedContent = useMemo(() => {
@@ -188,29 +267,45 @@ export default function CellarPage() {
       <button
         key={group.key}
         onClick={() => setSelectedWine(wine)}
-        className="w-full cursor-pointer text-left"
+        className="w-full cursor-pointer text-left nm-raised-sm"
         style={{
           display: "flex",
           gap: "14px",
           padding: "14px 16px",
-          background: "#FFFFFF",
-          border: `1px solid ${wine.status === "coravined" ? "rgba(142,58,72,0.19)" : "#DDD5CA"}`,
           borderRadius: "16px",
-          boxShadow: "0 1px 6px rgba(45,36,27,0.04)",
           alignItems: "center",
+          transition: "all 0.15s ease",
         }}
       >
         <div
+          className={wine.photo_url ? "" : "nm-inset"}
           style={{
             width: "56px",
             height: "56px",
             borderRadius: "12px",
             flexShrink: 0,
-            background: wine.photo_url
-              ? `url(${wine.photo_url}) center/cover`
-              : "linear-gradient(145deg, rgba(114,47,55,0.08), #F0EBE3 60%)",
+            ...(wine.photo_url
+              ? { background: `url(${wine.photo_url}) center/cover` }
+              : {
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  fontSize: "22px",
+                }),
           }}
-        />
+        >
+          {!wine.photo_url && (
+            <span style={{ opacity: 0.5 }}>
+              {wine.varietal?.toLowerCase().includes("pinot noir") || wine.varietal?.toLowerCase().includes("cabernet") || wine.varietal?.toLowerCase().includes("merlot") || wine.varietal?.toLowerCase().includes("syrah") || wine.varietal?.toLowerCase().includes("malbec") || wine.varietal?.toLowerCase().includes("zinfandel") || wine.varietal?.toLowerCase().includes("sangiovese") || wine.varietal?.toLowerCase().includes("gamay") || wine.varietal?.toLowerCase().includes("red")
+                ? "🍷"
+                : wine.varietal?.toLowerCase().includes("chardonnay") || wine.varietal?.toLowerCase().includes("riesling") || wine.varietal?.toLowerCase().includes("sauvignon") || wine.varietal?.toLowerCase().includes("chenin") || wine.varietal?.toLowerCase().includes("greco")
+                  ? "🥂"
+                  : wine.varietal?.toLowerCase().includes("champagne") || wine.varietal?.toLowerCase().includes("sparkling")
+                    ? "🍾"
+                    : "🍷"}
+            </span>
+          )}
+        </div>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div className="flex items-center gap-2">
             <div className="font-serif font-semibold truncate" style={{ fontSize: "14px", color: "#2D241B", flex: 1 }}>
@@ -261,19 +356,113 @@ export default function CellarPage() {
         <h1 className="font-serif font-bold" style={{ fontSize: "32px", color: "#2D241B", letterSpacing: "-0.3px", marginBottom: "4px", lineHeight: 1.15 }}>
           Cellar
         </h1>
-        <div style={{ fontSize: "13px", color: "#8C7E72", marginBottom: "16px" }}>
+        <div style={{ fontSize: "13px", color: "#8C7E72", marginBottom: "12px" }}>
           {activeWines.length} bottle{activeWines.length !== 1 ? "s" : ""}
-          {wineGroups.length !== filteredWines.length && filter === "active" && ` · ${wineGroups.length} unique`}
+          {wineGroups.length !== searchedWines.length && filter === "active" && ` · ${wineGroups.length} unique`}
         </div>
 
+        {/* Search bar */}
+        <div className="nm-inset" style={{ borderRadius: "14px", marginBottom: "12px", padding: "2px" }}>
+          <div className="flex items-center" style={{ padding: "10px 14px", gap: "10px" }}>
+            <span style={{ fontSize: "16px", opacity: 0.5 }}>🔍</span>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search wines, producers, regions..."
+              style={{
+                flex: 1,
+                background: "transparent",
+                border: "none",
+                fontSize: "14px",
+                color: "#2D241B",
+                outline: "none",
+              }}
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="cursor-pointer"
+                style={{
+                  background: "transparent",
+                  border: "none",
+                  fontSize: "14px",
+                  color: "#8C7E72",
+                  padding: "2px 6px",
+                }}
+              >
+                ✕
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Refresh / Enrich button */}
+        {!enriching && activeWines.some((w) => !w.photo_url || !getDossier(w.id)) && (
+          <button
+            onClick={handleEnrichAll}
+            className="w-full cursor-pointer nm-raised-sm"
+            style={{
+              padding: "12px 16px",
+              borderRadius: "14px",
+              fontSize: "13px",
+              fontWeight: 500,
+              color: "#722F37",
+              marginBottom: "12px",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px",
+            }}
+          >
+            <span>✨</span> Enrich Cellar — add images & dossiers
+          </button>
+        )}
+
+        {/* Enrichment progress */}
+        {enriching && (
+          <div className="nm-inset" style={{
+            padding: "14px 16px",
+            borderRadius: "14px",
+            marginBottom: "12px",
+          }}>
+            <div className="flex items-center justify-between" style={{ marginBottom: "8px" }}>
+              <span style={{ fontSize: "13px", fontWeight: 500, color: "#2D241B" }}>
+                Enriching wines...
+              </span>
+              <span style={{ fontSize: "12px", color: "#8C7E72" }}>
+                {enrichProgress.done}/{enrichProgress.total}
+              </span>
+            </div>
+            <div style={{
+              height: "4px",
+              borderRadius: "2px",
+              background: "#DDD5CA",
+              overflow: "hidden",
+              marginBottom: "6px",
+            }}>
+              <div style={{
+                height: "100%",
+                borderRadius: "2px",
+                background: "linear-gradient(90deg, #722F37, #8E3A48)",
+                width: `${enrichProgress.total > 0 ? (enrichProgress.done / enrichProgress.total) * 100 : 0}%`,
+                transition: "width 0.5s ease",
+              }} />
+            </div>
+            <div className="truncate" style={{ fontSize: "11px", color: "#8C7E72" }}>
+              {enrichProgress.current}
+            </div>
+          </div>
+        )}
+
         {/* Sort toggle */}
-        <div className="flex gap-1" style={{ background: "#F0EBE3", borderRadius: "100px", padding: "3px", marginBottom: "12px" }}>
+        <div className="flex gap-1 nm-inset" style={{ borderRadius: "100px", padding: "4px", marginBottom: "12px" }}>
           {(["region", "urgency"] as const).map((m) => (
-            <button key={m} onClick={() => setSortMode(m)} className="flex-1 cursor-pointer" style={{
+            <button key={m} onClick={() => setSortMode(m)} className={`flex-1 cursor-pointer ${sortMode === m ? "nm-raised-sm" : ""}`} style={{
               padding: "8px 16px", borderRadius: "100px", fontSize: "13px", fontWeight: 500,
-              border: "none", background: sortMode === m ? "#FFFFFF" : "transparent",
+              border: "none", background: sortMode === m ? "#FAF7F2" : "transparent",
               color: sortMode === m ? "#2D241B" : "#8C7E72",
-              boxShadow: sortMode === m ? "0 1px 4px rgba(45,36,27,0.1)" : "none", transition: "all 0.2s",
+              transition: "all 0.2s",
             }}>
               {m === "region" ? "By Region" : "By Urgency"}
             </button>
@@ -283,10 +472,10 @@ export default function CellarPage() {
         {/* Filter pills */}
         <div className="flex gap-2 overflow-x-auto" style={{ marginBottom: "20px", paddingBottom: "4px", paddingLeft: "2px", paddingRight: "2px" }}>
           {filters.map((f) => (
-            <button key={f.id} onClick={() => setFilter(f.id)} className="whitespace-nowrap cursor-pointer transition-all duration-150" style={{
+            <button key={f.id} onClick={() => setFilter(f.id)} className={`whitespace-nowrap cursor-pointer transition-all duration-150 ${filter === f.id ? "nm-raised-sm" : ""}`} style={{
               padding: "7px 14px", borderRadius: "100px", fontSize: "12px", fontWeight: 500,
-              border: `1px solid ${filter === f.id ? "#722F37" : "#DDD5CA"}`,
-              background: filter === f.id ? "rgba(114,47,55,0.12)" : "transparent",
+              border: "none",
+              background: filter === f.id ? "#FAF7F2" : "transparent",
               color: filter === f.id ? "#722F37" : "#8C7E72",
             }}>
               {f.label}

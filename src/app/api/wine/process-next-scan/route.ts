@@ -153,6 +153,7 @@ export async function POST(req: NextRequest) {
         fridgeSuggestion: string;
         fridgeReason: string;
         suggestedTags: string[];
+        bottleImageUrl?: string;
       };
 
       let wines: WineData[] = [];
@@ -197,6 +198,7 @@ export async function POST(req: NextRequest) {
           fridge_reason: wine.fridgeReason || null,
           suggested_tags: wine.suggestedTags || null,
           duplicate_of: duplicateId,
+          bottle_image_url: wine.bottleImageUrl || null,
         };
       });
 
