@@ -93,7 +93,7 @@ Return ONLY a JSON object. No markdown fences, no preamble, no commentary — ON
       headers: {
         "Content-Type": "application/json",
         "x-api-key": apiKey,
-        "anthropic-version": "2025-03-01",
+        "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",

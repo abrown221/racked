@@ -34,7 +34,7 @@ export async function callClaude(
     headers: {
       "Content-Type": "application/json",
       "x-api-key": apiKey,
-      "anthropic-version": "2025-03-01",
+      "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify(body),
   });
@@ -59,10 +59,27 @@ export async function callClaude(
 
 export function parseJSON<T>(text: string): T | null {
   try {
+    // Strip markdown fences
     const cleaned = text.replace(/```json?|```/g, "").trim();
+    // Try direct parse first (fastest path)
     return JSON.parse(cleaned);
-  } catch (e) {
-    console.error("JSON parse error:", e, "Text was:", text.substring(0, 200));
+  } catch {
+    // Web search responses often include reasoning text before/after JSON.
+    // Extract the JSON object by finding the outermost { ... } or [ ... ].
+    try {
+      const objStart = text.indexOf("{");
+      const objEnd = text.lastIndexOf("}");
+      if (objStart !== -1 && objEnd > objStart) {
+        return JSON.parse(text.slice(objStart, objEnd + 1));
+      }
+      const arrStart = text.indexOf("[");
+      const arrEnd = text.lastIndexOf("]");
+      if (arrStart !== -1 && arrEnd > arrStart) {
+        return JSON.parse(text.slice(arrStart, arrEnd + 1));
+      }
+    } catch (e2) {
+      console.error("JSON parse error:", e2, "Text was:", text.substring(0, 300));
+    }
     return null;
   }
 }
