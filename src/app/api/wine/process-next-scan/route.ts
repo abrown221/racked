@@ -76,15 +76,18 @@ export async function POST(req: NextRequest) {
       .eq("status", "processing")
       .lt("created_at", new Date(Date.now() - 5 * 60 * 1000).toISOString());
 
-    // Pick oldest pending photo
-    const { data: pendingPhoto } = await supabase
+    // Atomically claim the oldest pending photo by updating in one step
+    // This prevents race conditions where two requests grab the same photo
+    const { data: claimedPhotos } = await supabase
       .from("scan_photos")
-      .select("*")
+      .update({ status: "processing" })
       .eq("cellar_id", cellarId)
       .eq("status", "pending")
       .order("created_at", { ascending: true })
       .limit(1)
-      .maybeSingle();
+      .select("*");
+
+    const pendingPhoto = claimedPhotos?.[0] || null;
 
     if (!pendingPhoto) {
       // Count remaining to report
@@ -99,12 +102,6 @@ export async function POST(req: NextRequest) {
         pendingCount: count || 0,
       });
     }
-
-    // Mark as processing
-    await supabase
-      .from("scan_photos")
-      .update({ status: "processing" })
-      .eq("id", pendingPhoto.id);
 
     console.log("[process-next-scan] Processing", {
       scanPhotoId: pendingPhoto.id,

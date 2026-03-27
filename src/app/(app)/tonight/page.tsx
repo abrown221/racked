@@ -67,7 +67,7 @@ export default function TonightPage() {
     if (!loading && activeWines.length > 0 && recommendations.length === 0) {
       loadRecommendations();
     }
-  }, [loading]);
+  }, [loading, activeWines.length]);
 
   const handleAsk = async () => {
     if (!askInput.trim()) return;

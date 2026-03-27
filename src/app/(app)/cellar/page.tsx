@@ -103,36 +103,41 @@ export default function CellarPage() {
     setEnrichProgress({ done: 0, total: needsEnrich.length, current: "" });
     let errors = 0;
 
-    for (let i = 0; i < needsEnrich.length; i++) {
-      const wine = needsEnrich[i];
-      const label = `${wine.vintage || "NV"} ${wine.producer || ""} ${wine.name}`.trim();
+    // Process wines in parallel batches of 3 for speed
+    const BATCH_SIZE = 3;
+    for (let i = 0; i < needsEnrich.length; i += BATCH_SIZE) {
+      const batch = needsEnrich.slice(i, i + BATCH_SIZE);
+      const labels = batch.map((w) => `${w.vintage || "NV"} ${w.producer || ""} ${w.name}`.trim());
       setEnrichProgress({
         done: i,
         total: needsEnrich.length,
-        current: errors > 0 ? `${label} (${errors} failed)` : label,
+        current: errors > 0 ? `${labels[0]} (${errors} failed)` : labels[0],
       });
 
-      try {
-        const res = await fetch("/api/wine/enrich", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ wineId: wine.id }),
-        });
+      const results = await Promise.allSettled(
+        batch.map(async (wine) => {
+          const res = await fetch("/api/wine/enrich", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ wineId: wine.id }),
+          });
+          if (!res.ok) {
+            const err = await res.json().catch(() => ({}));
+            throw new Error(err.error || `HTTP ${res.status}`);
+          }
+          return res.json();
+        })
+      );
 
-        if (!res.ok) {
+      for (let j = 0; j < results.length; j++) {
+        if (results[j].status === "rejected") {
           errors++;
-          const err = await res.json().catch(() => ({}));
-          console.error("Enrich failed for", label, err.error || res.status);
+          console.error("Enrich failed for", labels[j], (results[j] as PromiseRejectedResult).reason);
         }
-      } catch (err) {
-        errors++;
-        console.error("Enrich failed for", label, err);
       }
 
-      // Refresh UI every 5 wines so user sees progress
-      if ((i + 1) % 5 === 0) {
-        await refreshWines();
-      }
+      // Refresh UI after each batch so user sees progress
+      await refreshWines();
     }
 
     setEnrichProgress({

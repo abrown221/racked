@@ -93,7 +93,7 @@ Return ONLY a JSON object. No markdown fences, no preamble, no commentary — ON
       headers: {
         "Content-Type": "application/json",
         "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
+        "anthropic-version": "2025-03-01",
       },
       body: JSON.stringify({
         model: "claude-haiku-4-5-20251001",
@@ -113,11 +113,15 @@ Return ONLY a JSON object. No markdown fences, no preamble, no commentary — ON
 
     const data = await response.json();
 
-    // Extract text content from response
+    // Extract text content from response (filter out web search tool blocks)
     const textBlocks = (data.content || [])
       .filter((b: { type: string }) => b.type === "text")
       .map((b: { text: string }) => b.text)
       .join("\n");
+
+    if (!textBlocks.trim()) {
+      console.error("[enrich] No text blocks in response. Content types:", (data.content || []).map((b: { type: string }) => b.type));
+    }
 
     // Parse JSON from response
     let parsed: {
@@ -226,8 +230,9 @@ Return ONLY a JSON object. No markdown fences, no preamble, no commentary — ON
       }
     }
 
-    // Save dossier
-    if (needsDossier && parsed.estate) {
+    // Save dossier — save if ANY dossier field has content
+    const hasDossierContent = parsed.estate || parsed.winemaker || parsed.vinification || parsed.special || parsed.sentiment || (parsed.scores && parsed.scores.length > 0);
+    if (needsDossier && hasDossierContent) {
       const dossierData = {
         estate: parsed.estate || null,
         winemaker: parsed.winemaker || null,
