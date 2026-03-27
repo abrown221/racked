@@ -36,6 +36,7 @@ export default function CellarPage() {
     fridges,
     tastingNotes,
     loading,
+    addWine,
     updateWine,
     deleteWine,
     saveDossier,
@@ -46,6 +47,7 @@ export default function CellarPage() {
   } = useCellar();
   const router = useRouter();
   const [selectedWine, setSelectedWine] = useState<Wine | null>(null);
+  const [selectedGroup, setSelectedGroup] = useState<WineGroup | null>(null);
   const [tastingWine, setTastingWine] = useState<Wine | null>(null);
   const [filter, setFilter] = useState("active");
   const [sortMode, setSortMode] = useState<"region" | "urgency">("region");
@@ -266,7 +268,7 @@ export default function CellarPage() {
     return (
       <button
         key={group.key}
-        onClick={() => setSelectedWine(wine)}
+        onClick={() => { setSelectedWine(wine); setSelectedGroup(group); }}
         className="w-full cursor-pointer text-left nm-raised-sm"
         style={{
           display: "flex",
@@ -540,7 +542,8 @@ export default function CellarPage() {
           dossier={getDossier(selectedWine.id) || null}
           loadingDossier={researchingWineId === selectedWine.id}
           tastingNotes={tastingNotes[selectedWine.id] || []}
-          onClose={() => setSelectedWine(null)}
+          bottleCount={selectedGroup?.count || 1}
+          onClose={() => { setSelectedWine(null); setSelectedGroup(null); }}
           onConsume={handleConsume}
           onCoravin={handleCoravin}
           onResearch={() => handleResearch(selectedWine)}
@@ -548,10 +551,39 @@ export default function CellarPage() {
           onDelete={(wine) => {
             deleteWine(wine.id);
             setSelectedWine(null);
+            setSelectedGroup(null);
           }}
           onUpdate={(id, updates) => {
             updateWine(id, updates);
             setSelectedWine((prev) => prev ? { ...prev, ...updates } : null);
+          }}
+          onAddBottle={async () => {
+            if (!selectedWine) return;
+            const { id, cellar_id, date_added, created_at, updated_at, photo_path, coravined_date, consumed_date, ...wineData } = selectedWine;
+            const newWine = await addWine({
+              ...wineData,
+              status: "sealed",
+              coravined_date: null,
+              consumed_date: null,
+            });
+            if (newWine) {
+              setSelectedGroup((prev) => prev ? { ...prev, bottles: [...prev.bottles, newWine], count: prev.count + 1 } : null);
+            }
+          }}
+          onRemoveBottle={async () => {
+            if (!selectedGroup || selectedGroup.count <= 1) return;
+            // Remove a non-representative sealed bottle if possible
+            const removable = selectedGroup.bottles.find(
+              (b) => b.id !== selectedWine.id && b.status === "sealed"
+            ) || selectedGroup.bottles.find((b) => b.id !== selectedWine.id);
+            if (removable) {
+              await deleteWine(removable.id);
+              setSelectedGroup((prev) => prev ? {
+                ...prev,
+                bottles: prev.bottles.filter((b) => b.id !== removable.id),
+                count: prev.count - 1,
+              } : null);
+            }
           }}
         />
       )}

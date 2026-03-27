@@ -110,6 +110,8 @@ export default function ReviewQueuePage() {
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
         console.error("Scan action failed:", err);
+        setActionLoading(false);
+        return;
       }
 
       if (action === "add") {

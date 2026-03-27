@@ -383,48 +383,64 @@ export default function CameraPage() {
     e.target.value = "";
   };
 
+  const [addingToCellar, setAddingToCellar] = useState(false);
+
   const handleAddToCellar = async () => {
-    if (!cameraResult) return;
+    if (!cameraResult || addingToCellar) return;
+    setAddingToCellar(true);
 
-    // Convert data URL to File for upload
-    let photoFile: File | undefined;
-    if (cameraResult.photoDataUrl) {
-      const res = await fetch(cameraResult.photoDataUrl);
-      const blob = await res.blob();
-      photoFile = new File([blob], "label.jpg", { type: "image/jpeg" });
+    try {
+      // Convert data URL to File for upload
+      let photoFile: File | undefined;
+      if (cameraResult.photoDataUrl) {
+        const res = await fetch(cameraResult.photoDataUrl);
+        const blob = await res.blob();
+        photoFile = new File([blob], "label.jpg", { type: "image/jpeg" });
+      }
+
+      const parsedVintage = editVintage ? parseInt(editVintage, 10) : null;
+      const wineData = {
+        name: editName || cameraResult.name,
+        producer: editProducer || cameraResult.producer,
+        vintage: parsedVintage !== null && !isNaN(parsedVintage) ? parsedVintage : cameraResult.vintage,
+        region: cameraResult.region,
+        appellation: cameraResult.appellation,
+        varietal: cameraResult.varietal,
+        blend: cameraResult.blend,
+        alcohol: cameraResult.alcohol,
+        estimated_price: cameraResult.estimatedPrice,
+        drinking_window_start: cameraResult.drinkingWindow?.start,
+        drinking_window_end: cameraResult.drinkingWindow?.end,
+        fridge_suggestion: cameraResult.fridgeSuggestion,
+        fridge_reason: cameraResult.fridgeReason,
+        suggested_tags: cameraResult.suggestedTags,
+        fridge_id: selectedFridge,
+        price_paid: pricePaid ? parseFloat(pricePaid) : null,
+        status: "sealed" as const,
+        photo_url: cameraResult.bottleImageUrl || null,
+      };
+
+      // Add N bottles (each gets its own DB row for independent tracking)
+      const count = Math.max(1, Math.min(quantity, 24));
+      let addedAny = false;
+      for (let i = 0; i < count; i++) {
+        const result = await addWine(wineData, photoFile);
+        if (result) addedAny = true;
+      }
+
+      if (addedAny) {
+        setState("idle");
+        setCameraResult(null);
+        router.push("/cellar");
+      } else {
+        setCameraError("Failed to add wine to cellar. Please try again.");
+        setAddingToCellar(false);
+      }
+    } catch (err) {
+      console.error("Add to cellar error:", err);
+      setCameraError("Something went wrong adding to cellar. Please try again.");
+      setAddingToCellar(false);
     }
-
-    const parsedVintage = editVintage ? parseInt(editVintage, 10) : null;
-    const wineData = {
-      name: editName || cameraResult.name,
-      producer: editProducer || cameraResult.producer,
-      vintage: parsedVintage !== null && !isNaN(parsedVintage) ? parsedVintage : cameraResult.vintage,
-      region: cameraResult.region,
-      appellation: cameraResult.appellation,
-      varietal: cameraResult.varietal,
-      blend: cameraResult.blend,
-      alcohol: cameraResult.alcohol,
-      estimated_price: cameraResult.estimatedPrice,
-      drinking_window_start: cameraResult.drinkingWindow?.start,
-      drinking_window_end: cameraResult.drinkingWindow?.end,
-      fridge_suggestion: cameraResult.fridgeSuggestion,
-      fridge_reason: cameraResult.fridgeReason,
-      suggested_tags: cameraResult.suggestedTags,
-      fridge_id: selectedFridge,
-      price_paid: pricePaid ? parseFloat(pricePaid) : null,
-      status: "sealed" as const,
-      photo_url: cameraResult.bottleImageUrl || null,
-    };
-
-    // Add N bottles (each gets its own DB row for independent tracking)
-    const count = Math.max(1, Math.min(quantity, 24));
-    for (let i = 0; i < count; i++) {
-      await addWine(wineData, photoFile);
-    }
-
-    setState("idle");
-    setCameraResult(null);
-    router.push("/cellar");
   };
 
   return (
@@ -947,6 +963,7 @@ export default function CameraPage() {
             </button>
             <button
               onClick={handleAddToCellar}
+              disabled={addingToCellar}
               className="font-semibold cursor-pointer"
               style={{
                 flex: 2,
@@ -957,9 +974,10 @@ export default function CameraPage() {
                 color: "#FFFFFF",
                 fontSize: "15px",
                 boxShadow: "0 4px 16px rgba(114,47,55,0.25)",
+                opacity: addingToCellar ? 0.6 : 1,
               }}
             >
-              Add to Cellar{quantity > 1 ? ` (${quantity})` : ""}
+              {addingToCellar ? "Adding..." : `Add to Cellar${quantity > 1 ? ` (${quantity})` : ""}`}
             </button>
           </div>
         </div>

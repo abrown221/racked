@@ -15,6 +15,7 @@ type Props = {
   dossier: Dossier | null;
   loadingDossier: boolean;
   tastingNotes: TastingNote[];
+  bottleCount?: number;
   onClose: () => void;
   onConsume: (wine: Wine) => void;
   onCoravin: (wine: Wine) => void;
@@ -22,6 +23,8 @@ type Props = {
   onLoadNotes: () => void;
   onDelete: (wine: Wine) => void;
   onUpdate: (id: string, updates: Partial<Wine>) => void;
+  onAddBottle?: () => void;
+  onRemoveBottle?: () => void;
 };
 
 type ConfirmAction = "consume" | "coravin" | "delete" | null;
@@ -39,6 +42,9 @@ export default function WineDetail({
   onLoadNotes,
   onDelete,
   onUpdate,
+  bottleCount = 1,
+  onAddBottle,
+  onRemoveBottle,
 }: Props) {
   const [tab, setTab] = useState<"overview" | "dossier" | "notes">("overview");
   const [notesLoaded, setNotesLoaded] = useState(false);
@@ -262,6 +268,60 @@ export default function WineDetail({
                 style={{ ...inputStyle, flex: 1 }}
               />
             </div>
+            {/* Bottle quantity adjustment */}
+            {(onAddBottle || onRemoveBottle) && (
+              <div style={{ marginBottom: "12px" }}>
+                <div style={{ fontSize: "12px", color: "#8C7E72", marginBottom: "6px" }}>
+                  Bottles in cellar
+                </div>
+                <div className="flex items-center" style={{
+                  background: "#F0EBE3",
+                  border: "1px solid #DDD5CA",
+                  borderRadius: "14px",
+                  overflow: "hidden",
+                  maxWidth: "180px",
+                }}>
+                  <button
+                    onClick={onRemoveBottle}
+                    disabled={bottleCount <= 1}
+                    className="cursor-pointer"
+                    style={{
+                      width: "44px",
+                      height: "42px",
+                      background: "transparent",
+                      border: "none",
+                      fontSize: "18px",
+                      color: bottleCount <= 1 ? "#DDD5CA" : "#6B5E52",
+                    }}
+                  >
+                    −
+                  </button>
+                  <div style={{
+                    flex: 1,
+                    textAlign: "center",
+                    fontSize: "15px",
+                    fontWeight: 600,
+                    color: "#2D241B",
+                  }}>
+                    {bottleCount}
+                  </div>
+                  <button
+                    onClick={onAddBottle}
+                    className="cursor-pointer"
+                    style={{
+                      width: "44px",
+                      height: "42px",
+                      background: "transparent",
+                      border: "none",
+                      fontSize: "18px",
+                      color: "#6B5E52",
+                    }}
+                  >
+                    +
+                  </button>
+                </div>
+              </div>
+            )}
             <div className="flex gap-2">
               <button
                 onClick={() => setEditing(false)}
@@ -301,8 +361,17 @@ export default function WineDetail({
             >
               {wine.vintage} {wine.name}
             </h1>
-            <div style={{ fontSize: "15px", color: "#8C7E72", marginBottom: "14px" }}>
-              {wine.producer} · {wine.appellation || wine.region}
+            <div className="flex items-center gap-2" style={{ fontSize: "15px", color: "#8C7E72", marginBottom: "14px" }}>
+              <span>{wine.producer} · {wine.appellation || wine.region}</span>
+              {bottleCount > 1 && (
+                <span style={{
+                  fontSize: "11px", fontWeight: 600, color: "#A0864E",
+                  background: "rgba(160,134,78,0.12)", padding: "2px 8px",
+                  borderRadius: "100px",
+                }}>
+                  ×{bottleCount}
+                </span>
+              )}
             </div>
           </>
         )}
