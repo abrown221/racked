@@ -455,9 +455,20 @@ export function CellarProvider({ children }: { children: ReactNode }) {
 
   const saveDossier = useCallback(
     async (wineId: string, dossier: Partial<Dossier>) => {
+      // Only spread known dossier columns to avoid PostgREST
+      // "column does not exist" errors from unexpected fields
+      const safeData = {
+        wine_id: wineId,
+        estate: dossier.estate || null,
+        winemaker: dossier.winemaker || null,
+        vinification: dossier.vinification || null,
+        special: dossier.special || null,
+        scores: dossier.scores || null,
+        sentiment: dossier.sentiment || null,
+      };
       const { data, error: upsertErr } = await supabase
         .from("dossiers")
-        .upsert({ ...dossier, wine_id: wineId }, { onConflict: "wine_id" })
+        .upsert(safeData, { onConflict: "wine_id" })
         .select()
         .single();
       if (upsertErr) {

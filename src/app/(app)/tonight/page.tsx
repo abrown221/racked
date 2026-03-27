@@ -130,9 +130,13 @@ export default function TonightPage() {
           vintage: wine.vintage,
         }),
       });
-      const data = await res.json();
-      if (data && !data.error) {
-        await saveDossier(wine.id, data);
+      if (!res.ok) {
+        console.error("Research API error:", res.status);
+      } else {
+        const data = await res.json();
+        if (data && !data.error) {
+          await saveDossier(wine.id, data);
+        }
       }
     } catch (err) {
       console.error("Research error:", err);

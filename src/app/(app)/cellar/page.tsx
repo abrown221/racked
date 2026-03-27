@@ -255,9 +255,16 @@ export default function CellarPage() {
           vintage: wine.vintage,
         }),
       });
-      const data = await res.json();
-      if (data && !data.error) {
-        await saveDossier(wine.id, data);
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        console.error("Research API error:", res.status, err);
+      } else {
+        const data = await res.json();
+        if (data && !data.error) {
+          await saveDossier(wine.id, data);
+        } else {
+          console.error("Research returned error:", data?.error);
+        }
       }
     } catch (err) {
       console.error("Research error:", err);

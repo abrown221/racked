@@ -24,15 +24,32 @@ export async function POST(req: NextRequest) {
       true
     );
 
-    const result = parseJSON(text);
+    console.log("[research] Raw text length:", text.length, "preview:", text.substring(0, 200));
+
+    const result = parseJSON<Record<string, unknown>>(text);
     if (!result) {
+      console.error("[research] JSON parse failed. Full text:", text.substring(0, 500));
       return NextResponse.json(
         { error: "Failed to parse research" },
         { status: 422 }
       );
     }
 
-    return NextResponse.json(result);
+    console.log("[research] Parsed keys:", Object.keys(result));
+
+    // Only return fields that match the dossiers table schema.
+    // Claude with web search often returns extra fields that would cause
+    // the Supabase upsert to fail with "column does not exist".
+    const sanitized = {
+      estate: result.estate || null,
+      winemaker: result.winemaker || null,
+      vinification: result.vinification || null,
+      special: result.special || null,
+      scores: Array.isArray(result.scores) ? result.scores : null,
+      sentiment: result.sentiment || null,
+    };
+
+    return NextResponse.json(sanitized);
   } catch (error) {
     console.error("research error:", error);
     return NextResponse.json(
